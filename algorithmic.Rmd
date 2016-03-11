@@ -1,0 +1,11 @@
+---
+title: "Generation"
+output: word_document
+---
+```{r}
+#generate structures
+
+#analyze structures
+library(caret, quietly=TRUE)
+
+```

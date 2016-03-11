@@ -1,0 +1,26 @@
+---
+title: "obs"
+output: word_document
+---
+```{r}
+#number of participants
+np <- 30
+
+#number of questions
+nq <- 10
+
+#simulate responses as random binomials
+resp <- matrix(data=rbinom(n=np*nq, size=1, prob=0.7), nrow=np)
+
+colnames(resp) <- sapply(1:ncol(resp), function(x) paste0('q', x))
+rownames(resp) <- sapply(1:nrow(resp), function(x) paste0('p', x))
+
+#First 3 responses (success means agreement in liveliness assessment)
+head(resp, 3)
+
+#Overall detection
+binom.test(sum(resp), length(resp))
+
+#Individual question usability for analysis
+apply(resp, 2, function(x) binom.test(sum(x), length(x))$p.value)
+```

@@ -1,0 +1,10 @@
+---
+title: "analysis"
+output: word_document
+---
+
+```{r}
+#these are sample commands with output
+rver <- R.Version()
+rver$nickname
+```

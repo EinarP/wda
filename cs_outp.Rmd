@@ -1,0 +1,28 @@
+---
+title: "cs"
+output: word_document
+---
+```{r}
+#Load observations file
+obs <- read.csv('data/obs.csv', stringsAsFactors=FALSE)
+
+#Observations data frame structure
+str(obs, width=60, strict.width='cut')
+
+#Summary of object properties observed
+table(obs$property)
+
+#Sample observations of each property
+t(sapply(unique(obs$property), function(x) {
+  sobs <- obs[obs$property==x,]; sobs[1, ] }))
+```
+
+#data observations
+nobs <- 100
+
+dtstamp <- seq(from=Sys.time(), length.out=nobs, by='mins')
+object <- sample(c('obj1', 'obj2', 'obj3', 'obj4'), nobs, replace=TRUE)
+property <- sample(c('prop1', 'prop2', 'prop3', 'prop4'), nobs, replace=TRUE)
+value <- rnorm(nobs)
+
+obs <- data.frame(dtstamp, object, property, value)

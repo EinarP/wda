@@ -1,0 +1,8 @@
+---
+title: "analysis"
+output: word_document
+---
+
+```{r}
+library(tm)
+```
