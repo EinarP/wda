@@ -2,12 +2,29 @@ library(igraph)
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #Analysis trace
 
-ant <- list()
-
-plot.anseq <- function() {
+#construction
+asq <- function(x) {
     
+    meta <- list(name=x)
     
+    trace <- list(id=1, parent=NA, cmd='init', timeline=NA)
+    
+    struct <- list(graph.empty())
+    
+    structure(list(meta=meta, trace=trace, struct=struct), class='asq')
 }
+
+#print method
+print.asq <- function(x) {
+    
+    cat(x$meta$name, '\n\n')
+    
+    cat(unlist(lapply(kumm$trace, paste, collapse=" ")), '\n')
+    
+    tkplot(x$struct[[1]])
+}
+
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #CENTER transformations
 
