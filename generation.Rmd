@@ -9,20 +9,21 @@ source('func.R')
 #Load observations file
 obs <- read.csv('../data/obs.csv', stringsAsFactors=FALSE)
 
-#Create analysis sequence list (perhaps a tree later)
-ang <- make_empty_graph()
-angList <- list(ang)
+#Create analysis sequence (perhaps a tree later)
 
-ang <- addCenter(ang, 'LD.LOANS.AND.DEPOSITS')
-angList[[2]] <- ang
+ldsch <- asq('LD scheduling overview')
+ldsch <- addCenter(ldsch, 'LD.LOANS.AND.DEPOSITS')
+ldsch
 
-ang <- addCenter(ang, 'COUNTRY')
-angList[[3]] <- ang
+vc <- c(c1, c2, c...)
+ldsch <- voidCenter(ldscd, vc)
 
-ang <- voidCenter(ang, 'BILL.REGISTER')
-angList[[4]] <- ang
+addCenter( , scan='
 
-plot(ang)
+scaleDown()
+scaleUp()
+
+ldsch
 
 ```
 adjm <- matrix(c(0, 9, 0, 0), nrow=2, byrow=TRUE)
