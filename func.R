@@ -4,6 +4,10 @@ library(igraph)
 
 ant <- list()
 
+plot.anseq <- function() {
+    
+    
+}
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #CENTER transformations
 
