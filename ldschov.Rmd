@@ -18,10 +18,10 @@ ldsch
 vc <- c(c1, c2, c...)
 ldsch <- voidCenter(ldscd, vc)
 
-addCenter( , scan='
+addCenter(ldsch, 'LD.LOANS.AND.DEPOSITS', scan='LD')
 
-scaleDown()
-scaleUp()
+scaleDown(ldsch)
+scaleUp(ldsch)
 
 ldsch
 

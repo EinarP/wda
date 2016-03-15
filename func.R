@@ -5,25 +5,24 @@ library(igraph)
 #construction
 asq <- function(x) {
     
-    meta <- list(name=x)
+    m <- list(name=x)
     
-    trace <- list(id=1, parent=NA, cmd='init', timeline=NA)
+    t <- data.frame(id=1, parent=NA, cmd='init', timeline=NA,
+        stringsAsFactors=FALSE)
     
-    struct <- list(graph.empty())
+    s <- list(graph.empty())
     
-    structure(list(meta=meta, trace=trace, struct=struct), class='asq')
+    structure(list(meta=m, trace=t, struct=s), class='asq')
 }
 
 #print method
 print.asq <- function(x) {
     
     cat(x$meta$name, '\n\n')
+    print(tail(x$trace, 3))
     
-    cat(unlist(lapply(kumm$trace, paste, collapse=" ")), '\n')
-    
-    tkplot(x$struct[[1]])
+    if (vcount(x$struct[[1]]) > 0) tkplot(x$struct[[1]])
 }
-
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #CENTER transformations
