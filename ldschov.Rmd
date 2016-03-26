@@ -39,3 +39,14 @@ We need to scale down to attribute level to understand the structure better. No 
 ```
 
 What can we conclude based on analysis
+
+PS. Demonstration that brute force is not helpful with igraph
+```{r}
+el <- obs[obs$property=='linkdef', ]
+
+from <- sub('>.*$', '', el$object)
+to <- gsub("^[^>]+>\\s*", "", el$object)
+
+plot(graph.data.frame(data.frame(from, to, el$value)))
+```
+

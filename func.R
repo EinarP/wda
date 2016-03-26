@@ -34,12 +34,13 @@ print.asq <- function(x, seed=NA) {
   print(tail(x$seq[ ,2:ncol(x$seq)], 3))
 
 #Plot on requested device
-  if(vcount(x$struct[[1]]) > 0) {
+  curg <- tail(x$struct, 1)[[1]]
+  if(vcount(curg) > 0) {
     if(x$output=='plot') {
-      plot(x$struct[[1]], xlab=tail(x$seq, 1)$transformation,
+      plot(curg, xlab=tail(x$seq, 1)$transformation,
         edge.arrow.size=0.3, vertex.frame.color=NA, vertex.label.family='sans')   
     } else {
-      tkplot(x$struct[[1]])
+      tkplot(curg)
     }
   }
 }
@@ -47,21 +48,21 @@ print.asq <- function(x, seed=NA) {
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # trace sequence
-addAnalysisStep <- function(asq, cmd, ang, tline=NA) {
+addAnalysisStep <- function(aseq, cmd, ang, chkp=NA) {
   
-  newtr <- tail(asq$trace, 1)
+  newtr <- tail(aseq$seq, 1)
   
   newtr$parent <- newtr$id
   newtr$id <- newtr$id + 1
-  newtr$cmd <- deparse(cmd)
-  newtr$tline <- tline
+  newtr$transformation <- deparse(cmd)
+  newtr$checkpoint <- chkp
   
-  asq$trace <- rbind(asq$trace, newtr)
+  aseq$seq <- rbind(aseq$seq, newtr)
 
 #TODO: Likely need to save every graph and also clusters separately 
-  asq$struct[[1]] <- ang
+  aseq$struct[[length(aseq$struct)+1]] <- ang
   
-  asq
+  aseq
 }
 
 ################################################################################
@@ -69,9 +70,9 @@ addAnalysisStep <- function(asq, cmd, ang, tline=NA) {
 ################################################################################
 
 # Add centers
-addCenter <- function(aseq, center, level=0, tline=NA) {
+addCenter <- function(aseq, center, level=0, chkp=NA, req=NA) {
   
-  ang <- aseq$struct[[1]]
+  ang <- aseq$struct[[length(aseq$struct)]]
   
   for (i in 1:length(center)) {
     
@@ -85,8 +86,13 @@ addCenter <- function(aseq, center, level=0, tline=NA) {
       for (j in 1:length(lcenter)) {
         
         if (!is.element(lcenter[j], vertex.attributes(ang)$name)) {
-          aseq$struct[[1]] <- ang
-          ang <- addCenter(aseq, lcenter[j], level-1)$struct[[1]]
+          if (is.na(req)) {
+            aseq$struct[[length(aseq$struct)+1]] <- ang
+          } else {
+           aseq$struct[[length(aseq$struct)]] <- ang
+          }
+          nextseq <- addCenter(aseq, lcenter[j], level-1, req=TRUE)
+          ang <- nextseq$struct[[length(nextseq$struct)]]
         }
         
         ang <- ang + edge(center[i], lcenter[j])
@@ -94,7 +100,11 @@ addCenter <- function(aseq, center, level=0, tline=NA) {
     }
   }
   
-  addAnalysisStep(aseq, match.call(), ang, tline)
+  if (is.na(req)) {
+    addAnalysisStep(aseq, match.call(), ang, chkp)
+  } else {
+    
+  }
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
