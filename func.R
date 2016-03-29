@@ -86,13 +86,10 @@ addCenter <- function(aseq, center, level=0, chkp=NA, req=NA) {
       for (j in 1:length(lcenter)) {
         
         if (!is.element(lcenter[j], vertex.attributes(ang)$name)) {
-          if (is.na(req)) {
-            aseq$struct[[length(aseq$struct)+1]] <- ang
-          } else {
-           aseq$struct[[length(aseq$struct)]] <- ang
-          }
-          nextseq <- addCenter(aseq, lcenter[j], level-1, req=TRUE)
-          ang <- nextseq$struct[[length(nextseq$struct)]]
+          laseq <- aseq
+          laseq$struct[[length(aseq$struct)]] <- ang
+          laseq <- addCenter(laseq, lcenter[j], level-1, req=TRUE)
+          ang <- laseq$struct[[length(aseq$struct)]]
         }
         
         ang <- ang + edge(center[i], lcenter[j])
@@ -103,7 +100,8 @@ addCenter <- function(aseq, center, level=0, chkp=NA, req=NA) {
   if (is.na(req)) {
     addAnalysisStep(aseq, match.call(), ang, chkp)
   } else {
-    
+    aseq$struct[[length(aseq$struct)]] <- ang
+    aseq
   }
 }
 
