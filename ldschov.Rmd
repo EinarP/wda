@@ -24,7 +24,9 @@ There are too many edges shown and none of them seems useful. Remove these and r
 
 ```{r}
 #Remove clutter
-voidList <- grep('LD', V(ldsch$struct[[1]])$name, invert=TRUE, value=TRUE)
+getCenter(ldsch)
+
+voidList <- grep('LD', getCenter(ldsch), invert=TRUE, value=TRUE)
 ldsch <- voidCenter(ldsch, voidList)
 ldsch
 
