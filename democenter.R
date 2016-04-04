@@ -1,14 +1,9 @@
 
+#don't show 
+
 par(mfrow = c(1,1), cex.lab=0.8)
 
-#Common functions
-source('func.R')
-
-#demo data
-obs <- data.frame(object=character(), property=character(),
-  value=character(), dtstamp=character(), stringsAsFactors=FALSE)
-
-
+# demo data generation
 # obs <- data.frame(dtstamp='20160321', object='C1',
 #  property='field', value='id', stringsAsFactors=FALSE)
 # obs <- rbind(obs, c('20160321', 'C2', 'field', 'id'))
@@ -21,7 +16,7 @@ obs <- data.frame(object=character(), property=character(),
 # obs <- rbind(obs, c('20160321', 'C5>id', 'linkdef', 'C1'))
 
 obs <- data.frame(object=character(), property=character(),
-  value=character(), dtstamp=character(), stringsAsFactors=FALSE)
+    value=character(), dtstamp=character(), stringsAsFactors=FALSE)
 
 obs[1, ] <- c('C1>id','linkdef','C2','')
 obs[2, ] <- c('C1>id','linkdef','C3','')
@@ -34,13 +29,19 @@ obs[8, ] <- c('C9>id','linkdef','C3','')
 obs[9, ] <- c('C10>id','linkdef','C7','')
 obs[10, ] <- c('C7>id','linkdef','C2','')
 
+# Start display
+
+# Load common functions
+source('func.R')
+
+# Initial demo data
 obs
 
-#Start the analysis sequence
+# Start the analysis sequence
 trdemo <- asq('Transformations demonstration')
 
-#Add centers
-trdemo <- addCenter(trdemo, 'C1', depth=2)
+# Create centers
+trdemo <- addCenter(trdemo, 'C1', depth=1)
 trdemo
 
 #List current centers

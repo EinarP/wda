@@ -5,16 +5,17 @@ library(igraph)
 # Analysis object and related methods
 ################################################################################
 
-# construction
+# congraphion
 asq <- function(x) {
   
   s <- data.frame(id=1, parent=NA, transformation=paste0("asq('", x, "')"),
     checkpoint=NA, stringsAsFactors=FALSE)
-
-#TODO: Perhaps store vertices, edges, communities as data frame
+  
   g <- list(graph.empty())
+  c <- NA
 
-  structure(list(name=x, seed=1, output='plot', seq=s, struct=g), class='asq')
+  structure(list(name=x, seed=1, output='plot', seq=s, graph=g, community=c),
+    class='asq')
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -29,8 +30,8 @@ print.asq <- function(x, seed=NA) {
   cat(x$name, '\n\n')
   print(tail(x$seq[ ,3:ncol(x$seq)], 3))
 
-#Plot on requested device
-  curg <- tail(x$struct, 1)[[1]]
+#Plot on requested device (perhaps qgraph instead of igraph)
+  curg <- tail(x$graph, 1)[[1]]
   if(vcount(curg) > 0) {
     if(x$output=='plot') {
       plot(curg, xlab=tail(x$seq, 1)$transformation,
@@ -45,7 +46,7 @@ print.asq <- function(x, seed=NA) {
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # trace sequence
-addAnalysisStep <- function(aseq, cmd, ang, chkp=NA) {
+addAnalysisStep <- function(aseq, cmd, chkp=NA, ang=NA, anc=NA) {
   
   newtr <- tail(aseq$seq, 1)
   
@@ -56,8 +57,7 @@ addAnalysisStep <- function(aseq, cmd, ang, chkp=NA) {
   
   aseq$seq <- rbind(aseq$seq, newtr)
 
-#TODO: Perhaps need to save graphs and clusters separately 
-  aseq$struct[[length(aseq$struct)+1]] <- ang
+  aseq$graph[[length(aseq$graph)+1]] <- ang
   
   aseq
 }
@@ -69,7 +69,7 @@ addAnalysisStep <- function(aseq, cmd, ang, chkp=NA) {
 # Add centers
 addCenter <- function(aseq, center, depth=1, chkp=NA) {
   
-  ang <<- aseq$struct[[length(aseq$struct)]]
+  ang <<- aseq$graph[[length(aseq$graph)]]
   
   sapply(center, function(x) addNeighbor(x, depth))
 
@@ -81,7 +81,7 @@ addNeighbor <- function(center, depth) {
 
   # add head center if not present
   if (!is.element(center, vertex.attributes(ang)$name)) {
-    ang <<- ang + vertices(center, shape = 'rectangle')
+    ang <<- ang + vertices(center, shape='rectangle')
   }
 
   if (depth > 0) {  
@@ -116,7 +116,7 @@ addNeighbor <- function(center, depth) {
 # Retrieve all center references
 getCenter <- function(aseq) {
 
-  ang <- aseq$struct[[length(aseq$struct)]]
+  ang <- aseq$graph[[length(aseq$graph)]]
   
   vertex.attributes(ang)$name  
 }
@@ -126,13 +126,20 @@ getCenter <- function(aseq) {
 ################################################################################
 
 # Add boundary
-addBoundary <- function(aseq, clustering, tline=NA) {
+addBoundary <- function(aseq, method=NA, chkp=NA) {
   
-  trp <- aseq$struct[[length(aseq$struct)]]
-  tc <- make_clusters(trp, clustering)
+  ang <- aseq$graph[[length(aseq$graph)]]
+  
+  if (is.na(method)) {
+    anc <- make_clusters(ang, clustering)
+  } else {
+    
+  }
+  
+  tc <- 
   plot(tc, trp)
   
-  addAnalysisStep(aseq, match.call(), ang, tline)
+  addAnalysisStep(aseq, match.call(), chkp, ang=ang, anc=anc)
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -148,7 +155,7 @@ getBoundary <- function(x) {
 # Remove centers
 voidCenter <- function(aseq, center, tline=NA) {
   
-  ang <- aseq$struct[[length(aseq$struct)]]
+  ang <- aseq$graph[[length(aseq$graph)]]
   
   ang <- delete.vertices(ang, center)
   
