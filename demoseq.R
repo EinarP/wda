@@ -1,7 +1,10 @@
 
 #Common functions
 source('func.R')
+
 #demo data
+obs <- read.csv('../data/trdemo.csv', stringsAsFactors=FALSE)
+
 obs <- data.frame(dtstamp='20160321', object='C1', property='field', value='id',
   stringsAsFactors=FALSE)
 
@@ -15,11 +18,12 @@ obs <- rbind(obs, c('20160321', 'C1>id', 'linkdef', 'C3'))
 obs <- rbind(obs, c('20160321', 'C1>id', 'linkdef', 'C4'))
 obs <- rbind(obs, c('20160321', 'C5>id', 'linkdef', 'C1'))
 
+set.seed(1)
 par(mfrow = c(1, 3), cex.lab=1.3)
 trdemo <- asq('Transformations demonstration')
 
 #Center tranformation
-trdemo <- addCenter(trdemo, c('C1','C5'), level=1)
+trdemo <- addCenter(trdemo, c('C1','C5'))
 trdemo
 
 getCenter(trdemo)
