@@ -5,7 +5,7 @@ library(igraph)
 # Analysis object and related methods
 ################################################################################
 
-# TODO: Perhaps call all functions through wrapper
+# TODO: Perhaps call functions through common wrapper
 
 # Construction of analysis sequence object
 asq <- function(aname, adata) {
@@ -32,7 +32,7 @@ print.asq <- function(x, seed=NA) {
 
   # Excerpt of trace table
   cat(x$name, '\n\n')
-  print(tail(x$seq[ ,c('transformation','checkpoint')], 3))
+  print(tail(x$seq[,c('id','transformation','checkpoint')], 3), row.names=FALSE)
 
   # Plot on requested device (perhaps qgraph instead of igraph)
   ang <- tail(x$graph, 1)[[1]]
@@ -42,22 +42,23 @@ print.asq <- function(x, seed=NA) {
       plopt <- list(xlab=tail(x$seq, 1)$transformation, edge.arrow.size=0.2,
         vertex.frame.color=NA, vertex.label.family='sans', edge.label.cex=0.8)
       
-      cmethod <- tail(x$seq, 1)$community
-      if (is.na(cmethod)) {
-        
+      anc <- tail(x$seq, 1)$community
+      if (is.na(anc)) {
         do.call('plot', c(list(ang), plopt))
       } else {
-        
-        if (cmethod=='obs_community') {
-          obs <- get(x$data)
-          comm <- obs[obs$property=='community', ]
-          mship <- as.integer(comm[match(V(ang)$name, comm$object),'value'])
-          anc <- make_clusters(ang, mship)
+        if (existsFunction(anc)) {
+          anc <- do.call(anc, list(ang))
         } else {
-          anc <- do.call(cmethod, list(ang))
+          
+          #TODO: Include attibutes. Separate function perhaps
+          obs <- get(x$data)
+          comm <- obs[obs$property=='community' & obs$property==anc, ]
+          if (nrow(comm)) {
+            mship <- as.integer(comm[match(V(ang)$name, comm$object),'value'])
+            anc <- make_clusters(ang, mship)
+          }
         }
-        
-        do.call('plot', c(list(anc, ang), plopt))
+        if (class(anc)=='communities') do.call('plot', c(list(anc, ang), plopt))
       }
     } else {
       tkplot(ang)
@@ -78,7 +79,8 @@ addAnalysisStep <- function(aseq, cmd, chkp=NA, ang=NA, anc=NA) {
   
   newtr$transformation <- gsub(' = ', '=', deparse(cmd))
   newtr$checkpoint <- chkp
-  newtr$community <- ifelse(is.na(anc), newtr$community, anc)
+  
+  if (!is.na(anc)) newtr$community <- ifelse(anc=='remove', NA, anc)
   
   aseq$seq <- rbind(aseq$seq, newtr)
 
@@ -96,11 +98,12 @@ addAnalysisStep <- function(aseq, cmd, chkp=NA, ang=NA, anc=NA) {
 # CENTER transformations
 ################################################################################
 
-# Add centers
+# Add centers (center fun?)
 addCenter <- function(aseq, center, depth=1, chkp=NA) {
   
   ang <<- aseq$graph[[length(aseq$graph)]]
 
+  # TODO: For passing optional arguments use ...
   sapply(center, function(x) addNeighbor(aseq, x, depth))
 
   addAnalysisStep(aseq, match.call(), chkp, ang=ang)
@@ -158,11 +161,11 @@ getCenter <- function(aseq) {
 # BOUNDARY transformations
 ################################################################################
 
-# Add boundary
+# Add boundary (boundary fun?)
 addBoundary <- function(aseq, method=NA, chkp=NA) {
-  
+
   if (is.na(method)) {
-    anc <- 'obs_community'
+    anc <- 'remove'
   } else {
     anc <- method
   }
@@ -202,10 +205,12 @@ drillDown <- function(aseq, center, values=FALSE, chkp=NA) {
   # Add values
   if (values) {
     valuespec <- obs[obs$property=='value', ]
-    apply(valuespec, 1, function(x) {
-      valuespec <- valuespec[grep(paste0(center, '>'), valuespec$object), ]
-      newlabel <- paste0(unlist(strsplit(x[1], '>', fixed=TRUE))[2], '=', x[3])
-      ang <<- set_vertex_attr(ang, 'label', index=V(ang)$name==x[1], value=newlabel)
+    apply(valuespec, 1, function(x, centers=center) {
+      curcenter <- unlist(strsplit(x[1], '>', fixed=TRUE))[1]
+      if (is.element(curcenter, centers)) {
+        newlabel <- paste0(V(ang)$label[V(ang)$name==x[1]],  '=', x[3])
+        ang <<- set_vertex_attr(ang, 'label', index=V(ang)$name==x[1], value=newlabel)
+      }
     })
   }
   
@@ -216,6 +221,85 @@ drillDown <- function(aseq, center, values=FALSE, chkp=NA) {
 
 # Level-of-scale implementation
 
+################################################################################
+# ALTERNATION transformations
+################################################################################
+
+# Implement bipartite graph with alternating centers and attributes. 
+# Might be useful when exploring data at the attribute level
+# Select links and convert to attributes with two links
+
+addAlternation <- function(aseq, chkp=NA) {
+  
+  ang <- aseq$graph[[length(aseq$graph)]]
+  
+  addAnalysisStep(aseq, match.call(), chkp, ang=ang)
+}
+
+voidAlternation <- function(aseq, chkp=NA) {
+  
+}
+
+################################################################################
+# SYMMETRY transformations
+################################################################################
+
+# Somehow create local symmetries, e.g. replicate attribute counts,
+# neighboring centers, etc.
+
+addSymmetries <- function(aseq, chkp=NA) {
+ 
+  ang <- aseq$graph[[length(aseq$graph)]]
+  
+  addAnalysisStep(aseq, match.call(), chkp, ang=ang) 
+}
+
+################################################################################
+# SPACE transformations
+################################################################################
+
+# Somehow create local symmetries, e.g. replicate attribute counts,
+# neighboring centers, etc.
+
+#TODO: replace add with apply prefix if not adding new elements
+addSpace <- function(aseq, chkp=NA) {
+  
+}
+
+################################################################################
+# ROUGHNESS transformations
+################################################################################
+
+# Somehow create local symmetries, e.g. replicate attribute counts,
+# neighboring centers, etc.
+
+polishSeed <- function(aseq, chkp=NA) {
+  
+  ang <- aseq$graph[[length(aseq$graph)]]
+  
+  addAnalysisStep(aseq, match.call(), chkp, ang=ang)
+}
+
+polishLayout <- function(aseq, chkp=NA) {
+  
+  ang <- aseq$graph[[length(aseq$graph)]]
+  
+  addAnalysisStep(aseq, match.call(), chkp, ang=ang)
+}
+
+################################################################################
+# GRADIENT transformations
+################################################################################
+
+# Fading or transparency based on some measures
+# Remote Centers without attributes as well?
+
+addGradient <- function(aseq, chkp=NA) {
+  
+  ang <- aseq$graph[[length(aseq$graph)]]
+  
+  addAnalysisStep(aseq, match.call(), chkp, ang=ang)
+}
 
 ################################################################################
 # VOID transformations

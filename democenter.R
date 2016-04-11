@@ -15,24 +15,23 @@ str(trdemobs)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Create centers
-trdemobs[trdemobs$property=='linkdef', ]
+# Subset of data for creating centers
+head(trdemobs[trdemobs$property=='linkdef', ])
 
+# Create centers
 trdemo <- addCenter(trdemo, 'C1', depth=2)
 trdemo
 
 # List current centers
 getCenter(trdemo)
 
-# Power centrality calculation (TODO: pehaps integrate with getCenter)
-power_centrality(trdemo$graph[[length(trdemo$graph)]])
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Include pregiven borders
-trdemobs[trdemobs$property=='linkdef', ]
+# Subset of data for pregiven communities
+tail(trdemobs[trdemobs$property=='community', ])
 
-trdemo <- addBoundary(trdemo)
+# Visualize pregiven communities 
+trdemo <- addBoundary(trdemo, method='community')
 trdemo
 
 # Apply community detection algorithm
@@ -44,25 +43,39 @@ getBoundary(trdemo)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Scale the graph
-trdemobs[trdemobs$property=='attribute', ]
+# Subset of data with attribute information
+head(trdemobs[trdemobs$property=='attribute', ])
 
 # Add all attributes
 attrCenters <- unique(trdemobs[trdemobs$property=='attribute', 'object'])
 trdemo <- drillDown(trdemo, attrCenters)
 trdemo
 
+# Subset of data with value information
+trdemobs[trdemobs$property=='value', ]
+
+# Add all values
+trdemo <- drillDown(trdemo, c('C1','C2'), values=TRUE)
+trdemo
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Alternation
+trdemo <- addAlternation(trdemo)
+trdemo
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Symmetries
+trdemo <- addSymmetries(trdemo)
+trdemo
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Space
+
+# Power centrality calculation (TODO: integrate with sp)
+power_centrality(trdemo$graph[[length(trdemo$graph)]])
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -99,6 +112,9 @@ trdemo
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Void: Remove clutter
+
+trdemo <- voidCenter(trdemo, 'C4')
+trdemo
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
