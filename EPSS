@@ -1,0 +1,44 @@
+*------------------------------------------------------------------------------
+* <Rating>99</Rating>
+*------------------------------------------------------------------------------
+    SUBROUTINE EPSS
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.STANDARD.SELECTION
+
+    outp = 'object,property,value'
+
+    FN.SS = 'F.STANDARD.SELECTION'
+    CALL OPF(FN.SS, F.SS)
+
+    selc = 'SELECT F.STANDARD.SELECTION WITH @ID UNLIKE NOFILE...'
+    CALL EB.READLIST(selc, ssList, '', ssCount, '')
+
+    FOR i = 1 TO ssCount
+
+        CALL F.READ(FN.SS, ssList<i>, R.SS, F.SS, '')
+
+        sysFieldCount = DCOUNT(R.SS<SSL.SYS.FIELD.NAME>, @VM)
+        FOR j = 1 TO sysFieldCount
+
+*TODO: Probably good idea to filter out RESERVED fields as well
+            IF j GT 1 AND R.SS<SSL.SYS.FIELD.NO,j> EQ 0 THEN CONTINUE
+
+            outl = ssList<i>
+            IF R.SS<SSL.SYS.REL.FILE,j> THEN
+                outl := '>':R.SS<SSL.SYS.FIELD.NAME,j>:',link_def,':R.SS<SSL.SYS.REL.FILE,j>
+            END ELSE
+                outl := ',attribute,':R.SS<SSL.SYS.FIELD.NAME,j>
+            END
+
+            outp<-1> = outl
+        NEXT j
+    NEXT i
+
+    CALL OPF('&HOLD&', F.HOLD)
+    WRITE outp TO F.HOLD,'ss.csv'
+
+    RETURN
+*************************************************************************
+END

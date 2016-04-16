@@ -12,10 +12,10 @@ library(igraph)
 source('func.R')
 
 #Load observations
-obs <- read.csv('../data/obs.csv', stringsAsFactors=FALSE)
+t24obs <- read.csv('../data/t24.csv', stringsAsFactors=FALSE)
 
 #Start from the root
-ldsch <- asq('LD scheduling overview')
+ldsch <- trsq('LD scheduling overview', 't24obs')
 ldsch <- addCenter(ldsch, 'LD.LOANS.AND.DEPOSITS')
 ldsch
 ```

@@ -1,12 +1,9 @@
 
-# Graphics parameters
-par(mfrow = c(1,1), cex.lab=0.8)
-
 # Common functions
 source('func.R')
 
 # Initialize the analysis sequence
-trdemo <- asq('Transformations demonstration', 'trdemobs')
+trdemo <- trsq('Demonstration sequence', 'trdemobs')
 trdemo
 
 # Sample data
@@ -16,7 +13,7 @@ str(trdemobs)
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Subset of data for creating centers
-head(trdemobs[trdemobs$property=='linkdef', ])
+head(trdemobs[trdemobs$property=='link_def', ])
 
 # Create centers
 trdemo <- addCenter(trdemo, 'C1', depth=2)
@@ -31,11 +28,12 @@ getCenter(trdemo)
 tail(trdemobs[trdemobs$property=='community', ])
 
 # Visualize pregiven communities 
-trdemo <- addBoundary(trdemo, method='community')
+trdemo <- trf(trdemo, boundary, community='community')
 trdemo
 
 # Apply community detection algorithm
-trdemo <- addBoundary(trdemo, method='cluster_walktrap')
+trdemo <- trf(trdemo, boundary, community='cluster_walktrap')
+trdemo <- addBoundary(trdemo, community='cluster_walktrap')
 trdemo
 
 # Current clustering
