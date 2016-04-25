@@ -2,37 +2,40 @@
 # Common functions
 source('func.R')
 
+# Sample data loading
+trdemobs <- read.csv('../data/trdemo.csv', stringsAsFactors=FALSE)
+
+# Structure of sample data
+str(trdemobs)
+
+# Summary of properties
+table(trdemobs$property)
+
 # Initialize the analysis sequence
 trdemo <- trsq('Demonstration sequence', 'trdemobs')
 trdemo
 
-# Sample data
-trdemobs <- read.csv('../data/trdemo.csv', stringsAsFactors=FALSE)
-str(trdemobs)
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Subset of data for creating centers
-head(trdemobs[trdemobs$property=='link_def', ])
+# Center candidates
+tryCenters(trdemo)
 
 # Create centers
-trdemo <- addCenter(trdemo, 'C1', depth=2)
+trdemo <- addCenters(trdemo, 'C01', depth=2)
 trdemo
 
 # List current centers
-getCenter(trdemo)
+getCenters(trdemo)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Subset of data for pregiven communities
-tail(trdemobs[trdemobs$property=='community', ])
-
 # Visualize pregiven communities 
-trdemo <- trf(trdemo, boundary, community='community')
+tail(trdemobs[trdemobs$property=='member', ])
+trdemo <- addBoundary(trdemo, community='member')
 trdemo
 
 # Apply community detection algorithm
-trdemo <- trf(trdemo, boundary, community='cluster_walktrap')
+tryBoundaries(trdemo)
 trdemo <- addBoundary(trdemo, community='cluster_walktrap')
 trdemo
 
@@ -41,25 +44,25 @@ getBoundary(trdemo)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Subset of data with attribute information
-head(trdemobs[trdemobs$property=='attribute', ])
+# Possible attributes
+tryAttributes(trdemo)
 
-# Add all attributes
+# Possible values
+tryValues(trdemo)
+
+# Add all attributes and values
 attrCenters <- unique(trdemobs[trdemobs$property=='attribute', 'object'])
-trdemo <- drillDown(trdemo, attrCenters)
+trdemo <- drillDown(trdemo, attrCenters, values=TRUE)
 trdemo
 
-# Subset of data with value information
-trdemobs[trdemobs$property=='value', ]
-
-# Add all values
-trdemo <- drillDown(trdemo, c('C1','C2'), values=TRUE)
-trdemo
+# Current attributes and values
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Alternation
+getAlternation(trdemo)
 trdemo <- addAlternation(trdemo)
+getAlternation(trdemo)
 trdemo
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -73,7 +76,7 @@ trdemo
 # Space
 
 # Power centrality calculation (TODO: integrate with sp)
-power_centrality(trdemo$graph[[length(trdemo$graph)]])
+power_centrality(trdemo$struct[[length(trdemo$struct)]])
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -111,7 +114,7 @@ power_centrality(trdemo$graph[[length(trdemo$graph)]])
 
 # Void: Remove clutter
 
-trdemo <- voidCenter(trdemo, 'C4')
+trdemo <- voidCenter(trdemo, 'C04')
 trdemo
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

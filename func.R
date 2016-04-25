@@ -5,39 +5,38 @@ library(igraph)
 # Analysis object and related methods
 ################################################################################
 
-# Construct an object composed of metadata, sequence table, and graph list
-trsq <- function(sqn, sqd) {
+# Construction of the sequence object
+trsq <- function(sqname, sqdata) {
   
-  structure(list(name=sqn, seed=1, output='plot', data=sqd,
-    seq=trfdesc(match.call()), graph=list(graph.empty())), class='trsq')
+  # Return an object composed of metadata, sequence table, list of structures
+  structure(list(name=sqname, seed=1, output='plot', data=sqdata,
+    seq=trfdesc(match.call()), struct=list(graph.empty())), class='trsq')
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Wrapper for transformations
-trf <- function(sq, tr, chkp=NA, data=NA, cl=NA, ...) {
+trf <- function(sq, trans, chkp=NA, data=NA, cl=NA, anc=NA, ...) {
 
-  # Last graph and community definition
-  curang <- tail(sq$graph, 1)[[1]]
-  curanc <- tail(sq$seq, 1)$community
+  # Last structure and community definitions
+  curang <- tail(sq$struct, 1)[[1]]
+  curanc <- ifelse(is.na(anc), tail(sq$seq, 1)$community, anc)
 
   # Call the transformation function
-  retval <- do.call(match.fun(tr),
+  curang <- do.call(match.fun(trans),
     args=list(dataref=sq$data, chkp=chkp, ang=curang, anc=curanc, ...))
   
-  # Assign transformation results accordingly
-  if (is_igraph(retval)) {
-    curang <- retval
-  } else { 
-    curanc <- retval
+  # Update partitioning if present
+  if (!is.na(curanc) & trans != 'boundary') {
+    curang <- boundary(ang=curang, anc=curanc, dataref=sq$data)
   }
-
-  # Capture the call if function called directly
+  
+  # Append a row to sequence table (capturing the call if called directly)
   if (class(cl) != 'call')  cl <- match.call()
-
-  # Append a row to sequence data frame and expand the graph list
   sq$seq <- rbind(sq$seq, trfdesc(cl, chkp, cmty=curanc))
-  sq$graph[[length(sq$graph)+1]] <- curang
+  
+  # Expand the structure list
+  sq$struct[[length(sq$struct)+1]] <- curang
   
   # Return the sequence  
   sq
@@ -61,24 +60,24 @@ print.trsq <- function(sq, seed=NA) {
   set.seed(ifelse(is.na(seed), sq$seed, seed))
 
   # Textual output
-  curlab <- tail(sq$seq, 1)$transformation
-#  if grep('=tryang', curlab) curlab <- tail(sq$seq, 1)$community
-  if (grepl('=tryanc', curlab)) {
-    curlab <- tail(sq$seq, 1)$community
-    print(curlab)
+  curxlab <- tail(sq$seq, 1)$transformation
+  if (grepl('=tryanc', curxlab)) {
+    curxlab <- tail(sq$seq, 1)$community
+    print(curxlab)
   } else {
     cat(sq$name, '\n\n')
     sqtail <- tail(sq$seq, 3)
-    print(cbind(id=format(sqtail$id, "%R"), sqtail[ ,2:3]), row.names=FALSE)
+#    print(cbind(id=format(sqtail$id, "%R"), sqtail[ ,2:3]), row.names=FALSE)
+    print(tail(sq$seq, 3)[2:3])
     par(mfrow = c(1,1), cex.lab=0.8)
   }
   
   # Plot on requested device
-  ang <- tail(sq$graph, 1)[[1]]
+  ang <- tail(sq$struct, 1)[[1]]
   if (vcount(ang) > 0) {
 
     # Graphics parameters
-    plopt <- list(xlab=curlab, edge.arrow.size=0.2,
+    plopt <- list(xlab=curxlab, edge.arrow.size=0.2,
       vertex.frame.color=NA, vertex.label.family='sans', edge.label.cex=0.8)
 
     if (sq$output=='plot') {
@@ -95,26 +94,16 @@ print.trsq <- function(sq, seed=NA) {
 # Sequence last graph plotting
 plot.trsq <- function(sq, plopt) {
   
-  ang <- tail(sq$graph, 1)[[1]]
+  ang <- tail(sq$struct, 1)[[1]]
   anc <- tail(sq$seq, 1)$community
   
-  # Plot a graph or a graph with community
+  # Output a graph or a graph with community
   if (is.na(anc)) {
     do.call('plot', c(list(ang), plopt))
   } else {
-    if (existsFunction(anc)) {
-      anc <- do.call(anc, list(ang))
-    } else {
-      
-      #TODO: Include attibutes. Separate function perhaps
-      obs <- get(sq$data)
-      comm <- obs[obs$property=='community' & obs$property==anc, ]
-      if (nrow(comm)) {
-        mship <- as.integer(comm[match(V(ang)$name, comm$object),'value'])
-        anc <- make_clusters(ang, mship)
-      }
-    }
-    if (class(anc)=='communities') do.call('plot', c(list(anc, ang), plopt))
+    mship <- V(ang)$membership
+    anc <- make_clusters(ang, as.numeric(factor(mship)))
+    do.call('plot', c(list(anc, ang), plopt))
   }
 }
 
@@ -122,10 +111,17 @@ plot.trsq <- function(sq, plopt) {
 # CENTER transformations
 ################################################################################
 
-# List center candidates
+# Explore center candidates
 tryCenters <- function(sq) {
+  
   obs <- get(sq$data)
-  unique(obs[obs$property=='attribute','object'])
+  
+  attrobs <- obs[obs$property=='attribute','object']
+  
+  linkobs <- strsplit(obs[grepl('link_', obs$property), 'object'], '>')
+  linkobs <- sapply(linkobs, function(x) x[1])
+  
+  sort(unique(c(attrobs, linkobs)))
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -136,7 +132,7 @@ addCenters <- function(sq, centers, depth=1) {
 }
 
 # Add centers
-center <- function(ang, dataref, ...) {
+center <- function(ang, anc, dataref, ...) {
 
   # Temporary global graph
   tmpang <<- ang
@@ -188,7 +184,8 @@ addNeighbor <- function(center, dataref, depth) {
       anglink <- paste(ange[,1], E(tmpang)$label, ange[,2], sep='>')
       if (!is.element(curlink, anglink)) {
         newlink <- unlist(strsplit(curlink, '>', fixed=TRUE))[2]
-        tmpang <<- tmpang + edge(newhead, newtail, label=newlink, arrow.mode=2)
+        tmpang <<- tmpang + edge(newhead, newtail,
+          label=newlink, edge.arrow.size=0.2, arrow.mode=2)
       }
     })
   }
@@ -198,14 +195,15 @@ addNeighbor <- function(center, dataref, depth) {
 
 # Retrieve current centers
 getCenters <- function(sq) {
-  ang <- tail(sq$graph, 1)[[1]]
-  vertex.attributes(ang)$name  
+  ang <- tail(sq$struct, 1)[[1]]
+  V(ang)$name[!grepl('>', V(ang)$name)]
 }
 
 ################################################################################
 # BOUNDARY transformations
 ################################################################################
 
+# Explore clustering algorithms
 tryBoundaries <- function(sq) {
   
   # Available algorithms
@@ -213,7 +211,7 @@ tryBoundaries <- function(sq) {
     'cluster_optimal','cluster_spinglass','cluster_walktrap')  
   
   # Apply the algorithms
-  par(mfrow=c(3,3), cex.lab=1)
+  par(mfrow=c(2,3), cex.lab=1, mar=c(5, 0, 3, 0))
   lapply(methods, function(tryanc) addBoundary(sq, tryanc))
 }
 
@@ -221,26 +219,46 @@ tryBoundaries <- function(sq) {
 
 # User-friendly function call
 addBoundary <- function(sq, community) {
-  trf(sq, 'boundary', community=community, cl=match.call())
+  trf(sq, 'boundary', anc=community, cl=match.call())
 }
 
 # Add boundary
-boundary <- function(community, ...) {
+boundary <- function(ang, anc, dataref, ...) {
 
-#  if (is.na(method)) {
-#    anc <- 'remove'
-#  } else {
-#    anc <- method
-#  }
+  tmpang <<- ang
   
-  community
+  if (existsFunction(anc)) {
+    
+    # Apply community detection algorithm
+    comm <- do.call(anc, list(tmpang))
+    V(tmpang)$membership <- comm$membership
+  } else {
+
+    # Use pregiven communities    
+    obs <- get(dataref)
+    comm <- obs[obs$property==anc, c('object','value')]
+    if (nrow(comm)) {
+      apply(comm, 1, function(x) {
+        
+        # Center
+        tmpang <<- set_vertex_attr(tmpang, 'membership',
+          index=V(ang)$name==x[1], value=x[2])
+        
+        # Center attributes
+        tmpang <<- set_vertex_attr(tmpang, 'membership',
+          index=grepl(paste0(x[1], '>'), V(tmpang)$name), value=x[2])
+      })
+    } else {
+      stop('No memberships pregiven.')
+    }
+  }
+  tmpang
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Describe current boundary
 getBoundary <- function(x) {
-  
   tail(x$seq, 1)$community
 }
 
@@ -248,36 +266,87 @@ getBoundary <- function(x) {
 # SCALE transformations
 ################################################################################
 
-# Add attributes and/or values to centers  (TODO: rename to "scale"?)
-drillDown <- function(aseq, center, values=FALSE, chkp=NA) {
-  
-  ang <<- aseq$graph[[length(aseq$graph)]]
-  
-  obs <- get(aseq$data)
+# Explore attribute candidates
+tryAttributes <- function(sq, centers=NA) {
 
+  obs <- get(sq$data)
+  if (!is.na(centers[1])) obs <- obs[obs$object==centers, ]
+  
+  attrobs <- with(obs[obs$property=='attribute', ], paste(object, value, sep='>'))
+  linkobs <- obs[grepl('link_', obs$property), 'object']
+  
+  sort(unique(c(attrobs, linkobs)))
+}
+
+# Explore value candidates
+tryValues <- function(sq, centers=NA) {
+  
+  obs <- get(sq$data)
+  if (!is.na(centers[1])) obs <- obs[obs$object==centers, ]
+  
+  obs[obs$property=='value', c('object','value')]
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# User-friendly function call
+drillDown <- function(sq, centers=NA, values=FALSE) {
+    trf(sq, 'scale', centers=centers, values=values, cl=match.call())
+}
+
+# Add values to centers and/or attributes 
+scale <- function(ang, anc, dataref, ...) {
+
+  # Temporary global graph
+  tmpang <<- ang
+
+  # Specific arguments
+  aargs <- list(...)
+  centers <- aargs$centers
+  values <- aargs$values
+  
+  obs <- get(dataref)
+  
   # Add attributes
-  attrspec <- obs[is.element(obs$object, center) & obs$property=='attribute', ]
+  attrspec <- obs[is.element(obs$object, centers) & obs$property=='attribute', ]
   apply(attrspec, 1, function(x) {
     aname <- paste(x[1], x[3], sep='>')
-    if (!is.element(aname, vertex.attributes(ang)$name)) {
-      ang <<- ang + vertices(aname, label=x[3], shape='circle', size=5)
-      ang <<- ang + edge(x[1], aname, label=NA, arrow.mode=0)
+    if (!is.element(aname, vertex.attributes(tmpang)$name)) {
+      tmpang <<- tmpang + vertices(aname, label=x[3], shape='circle', size=5)
+      tmpang <<- tmpang + edge(x[1], aname, label=NA, arrow.mode=0)
     }
   })
   
   # Add values
   if (values) {
     valuespec <- obs[obs$property=='value', ]
-    apply(valuespec, 1, function(x, centers=center) {
+    apply(valuespec, 1, function(x) {
       curcenter <- unlist(strsplit(x[1], '>', fixed=TRUE))[1]
       if (is.element(curcenter, centers)) {
-        newlabel <- paste0(V(ang)$label[V(ang)$name==x[1]],  '=', x[3])
-        ang <<- set_vertex_attr(ang, 'label', index=V(ang)$name==x[1], value=newlabel)
+        newlabel <- paste0(V(tmpang)$label[V(tmpang)$name==x[1]],  '=', x[3])
+        tmpang <<- set_vertex_attr(tmpang, 'label',
+          index=V(tmpang)$name==x[1], value=newlabel)
       }
     })
   }
+  tmpang
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# Retrieve current attributes
+getAttributes <-function(sq) {
+  ang <- tail(sq$struct, 1)[[1]]
+  V(ang)$name[grepl('>', V(ang)$name)]
+}
+
+# Retrieve current values
+getValues <-function(sq) {
   
-  addAnalysisStep(aseq, match.call(), chkp, ang=ang)
+  ang <- tail(sq$struct, 1)[[1]]
+  
+  values <- grepl('=', V(ang)$label)
+  as.data.frame(list(center=V(ang)$name[values], attrvalue=V(ang)$label[values]))
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -289,18 +358,29 @@ drillDown <- function(aseq, center, values=FALSE, chkp=NA) {
 ################################################################################
 
 # Implement bipartite graph with alternating centers and attributes. 
+
 # Might be useful when exploring data at the attribute level
 # Select links and convert to attributes with two links
 
-alternation <- function(aseq, chkp=NA) {
-  
-  ang <- aseq$graph[[length(aseq$graph)]]
-  
-  addAnalysisStep(aseq, match.call(), chkp, ang=ang)
+# User-friendly function call
+addAlternation <- function(sq) {
+  trf(sq, 'alternation', cl=match.call())
 }
 
-voidAlternation <- function(aseq, chkp=NA) {
+alternation <- function(ang, anc, dataref, ...) {
   
+  tmpang <- ang
+  
+  tmpang
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# Get current alternation status
+getAlternation <- function(sq) {
+  ang <- tail(sq$struct, 1)[[1]]
+  is.bipartite(ang)
 }
 
 ################################################################################
@@ -310,23 +390,45 @@ voidAlternation <- function(aseq, chkp=NA) {
 # Somehow create local symmetries, e.g. replicate attribute counts,
 # neighboring centers, etc.
 
-symmetry <- function(aseq, chkp=NA) {
+addSymmetries <- function(sq) {
+  trf(sq, 'symmetry', cl=match.call())
+}
+
+symmetry <- function(ang, anc, dataref, ...) {
  
-  ang <- aseq$graph[[length(aseq$graph)]]
+  tmpang <- ang
   
-  addAnalysisStep(aseq, match.call(), chkp, ang=ang) 
+  tmpang
 }
 
 ################################################################################
 # SPACE transformations
 ################################################################################
 
+addSpace <- function(sq, method=NA) {
+  trf(sq, 'space', method=method, cl=match.call())
+}
+
 # Somehow create local symmetries, e.g. replicate attribute counts,
 # neighboring centers, etc.
 
 #TODO: replace add with apply prefix if not adding new elements
-space <- function(aseq, chkp=NA) {
+space <- function(ang, dataref, method, ...) {
+
+  if (!is.na(method)) {
+  # TODO: If algorithmic convert to center-only graph (function?) 
+    tmpang <- alternation(ang, remove=TRUE)
+    tmpang <- void(tmpang, getAttributes(ang))
+  }
   
+#  V(ang)$size <- sample(10:20, length(V(ang)), replace=TRUE)
+  btw <- betweenness(ang) + 3
+  V(ang)$size <- btw
+  
+  E(ang)$width <- sample(1:5, length(E(ang)), replace=TRUE)
+  E(ang)$arrow.size <- E(ang)$width^2
+  
+  ang
 }
 
 ################################################################################
@@ -342,14 +444,14 @@ polish <- function(aseq, chkp=NA) {
 
 polishSeed <- function(aseq, chkp=NA) {
   
-  ang <- aseq$graph[[length(aseq$graph)]]
+  ang <- aseq$struct[[length(aseq$struct)]]
   
   addAnalysisStep(aseq, match.call(), chkp, ang=ang)
 }
 
 polishLayout <- function(aseq, chkp=NA) {
   
-  ang <- aseq$graph[[length(aseq$graph)]]
+  ang <- aseq$struct[[length(aseq$struct)]]
   
   addAnalysisStep(aseq, match.call(), chkp, ang=ang)
 }
@@ -363,7 +465,7 @@ polishLayout <- function(aseq, chkp=NA) {
 
 gradient <- function(aseq, chkp=NA) {
   
-  ang <- aseq$graph[[length(aseq$graph)]]
+  ang <- aseq$struct[[length(aseq$struct)]]
   
   addAnalysisStep(aseq, match.call(), chkp, ang=ang)
 }
@@ -375,7 +477,7 @@ gradient <- function(aseq, chkp=NA) {
 # Highlight paths (kateto.net good example?) and perhaps also centers/attributes
 contrast <- function(aseq, chkp=NA) {
   
-  ang <- aseq$graph[[length(aseq$graph)]]
+  ang <- aseq$struct[[length(aseq$struct)]]
   
   addAnalysisStep(aseq, match.call(), chkp, ang=ang)
 }
@@ -387,7 +489,7 @@ contrast <- function(aseq, chkp=NA) {
 # Group centers and attributes to logical units
 group <- function(aseq, member, group, chkp=NA) {
   
-  ang <- aseq$graph[[length(aseq$graph)]]
+  tmpang <- aseq$struct[[length(aseq$struct)]]
 
 # Select attributes presented by member argument  
 
@@ -396,7 +498,8 @@ group <- function(aseq, member, group, chkp=NA) {
 # Recreate member node edges connected to group vertex
   
 # Delete member edges
-  
+
+  tmpang
 }
 
 # TODO: Possible to convert communities to groups?
@@ -431,27 +534,45 @@ simplicity <- function(aseq, center, chkp=NA) {
   
 }
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
 ################################################################################
 # VOID transformations
 ################################################################################
 
-void <- function(aseq, center, chkp=NA) {
-  
+# Remove centers
+voidCenter <- function(sq, centers) {
+  trf(sq, 'void', centers=centers, cl=match.call())
 }
 
-# Remove centers
-voidCenter <- function(aseq, center, chkp=NA) {
+void <- function(ang, ...) {
   
-  ang <- aseq$graph[[length(aseq$graph)]]
+    # Specific arguments
+  aargs <- list(...)
+  centers <- aargs$centers
+
+  ang <- delete.vertices(tmpang, centers)
   
-  ang <- delete.vertices(ang, center)
+  #TODO: Void related attributes if any
   
-  addAnalysisStep(aseq, match.call(), chkp, ang=ang)
+  ang
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# Either belongs to alternation transformation or calls alternation from here
+voidAlternation <- function(sq) {
+  tail(trdemo$struct, 1)[[1]] 
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# TODO: fix if (!is.na(anc)) newtr$community <- ifelse(anc=='remove', NA, anc)      
+# TODO: fix if (!is.na(anc)) newtr$community <- ifelse(anc=='remove', NA, anc)
+voidBoundary <- function(aseq, chkp=NA) {
+  
+}
 
 
 ################################################################################
@@ -464,4 +585,3 @@ voidCenter <- function(aseq, center, chkp=NA) {
 signoff <- function(aseq, center, chkp=NA) {
   
 }
-

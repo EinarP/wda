@@ -16,7 +16,7 @@ t24obs <- read.csv('../data/t24.csv', stringsAsFactors=FALSE)
 
 #Start from the root
 ldsch <- trsq('LD scheduling overview', 't24obs')
-ldsch <- addCenter(ldsch, 'LD.LOANS.AND.DEPOSITS')
+ldsch <- addCenters(ldsch, 'LD.LOANS.AND.DEPOSITS')
 ldsch
 ```
 
