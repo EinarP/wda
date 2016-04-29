@@ -5,82 +5,104 @@ library(igraph)
 # Analysis object and related methods
 ################################################################################
 
-# Construction of the sequence object
-trsq <- function(sqname, sqdata) {
+# Contruct the transformations sequence object
+trsq <- function(sqname, trfdata, ...) {
+
+  # Empty graph with default settings  
+  ang <- trfattr(graph.empty(), match.call(), name=sqname,
+    data=trfdata, seed=1, output='plot', partitioning=NA, ...)
   
-  # Return an object composed of metadata, sequence table, list of structures
-  structure(list(name=sqname, seed=1, output='plot', data=sqdata,
-    seq=trfdesc(match.call()), struct=list(graph.empty())), class='trsq')
+  # Return a list comprised of an empty graph
+  structure(list(ang), class='trsq')
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Wrapper for transformations
-trf <- function(sq, trans, chkp=NA, data=NA, cl=NA, anc=NA, ...) {
-
-  # Last structure and community definitions
-  curang <- tail(sq$struct, 1)[[1]]
-  curanc <- ifelse(is.na(anc), tail(sq$seq, 1)$community, anc)
+trf <- function(sq, trans, cl, ...) {
+  
+  # Update the last structure and community definitions
+  ang <- trfattr(tail(sq, 1)[[1]], cl, ...)
 
   # Call the transformation function
-  curang <- do.call(match.fun(trans),
-    args=list(dataref=sq$data, chkp=chkp, ang=curang, anc=curanc, ...))
+  ang <- do.call(match.fun(trans), args=list(ang, ...))
   
-  # Update partitioning if present
-  if (!is.na(curanc) & trans != 'boundary') {
-    curang <- boundary(ang=curang, anc=curanc, dataref=sq$data)
+  # Update communities if partitioning present
+  if (!is.na(ang$partitioning) & trans != 'boundary') {
+    curang <- boundary(ang=curang)
   }
   
-  # Append a row to sequence table (capturing the call if called directly)
-  if (class(cl) != 'call')  cl <- match.call()
-  sq$seq <- rbind(sq$seq, trfdesc(cl, chkp, cmty=curanc))
-  
   # Expand the structure list
-  sq$struct[[length(sq$struct)+1]] <- curang
-  
+  sq[[length(sq)+1]] <- ang
+   
   # Return the sequence  
   sq
-}  
+}
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Transformation descriptor line generation
-trfdesc <- function(cl, chkp=NA, ann=NA, cmty=NA) {
+# Internal function for setting tranformation attributes
+trfattr <- function(ang, cl, ...) {
   
-  data.frame(id=Sys.time(), transformation=gsub(' = ', '=', deparse(cl)),
-    checkpoint=chkp, annotation=ann, community=cmty, stringsAsFactors=FALSE)
+  # Mandatory attributes
+  ang$dtstamp <- Sys.time()
+  if (class(cl) == 'call') ang$transformation <- gsub(' = ', '=', deparse(cl))
+  
+  # Arbitrary attributes
+  aargs <- list(...)
+  knownargs <- c('name', 'data', 'seed', 'partitioning', 'output')
+  for (idx in seq_along(aargs)) {
+    curname <- names(aargs[idx])
+    if (is.element(curname, knownargs)) {
+      ang <- set_graph_attr(ang, curname, aargs[[idx]])
+    }
+  }
+  
+  ang
 }
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# Return a summary table
+summary.trsq <- function(sq) {
+
+  sumrows <- lapply(sq, function(x) {
+    data.frame(dtstamp=x$dtstamp,
+        transformation=x$transformation, stringsAsFactors=FALSE)
+  })
+  Reduce(function(...) merge(..., all=TRUE), sumrows)
+}  
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Sequence overview printing
 print.trsq <- function(sq, seed=NA) {
+
+  ang <- tail(sq, 1)[[1]]
   
   # Set random number generator
-  set.seed(ifelse(is.na(seed), sq$seed, seed))
-
+  set.seed(ifelse(is.na(seed), ang$seed, seed))
+  
   # Textual output
-  curxlab <- tail(sq$seq, 1)$transformation
-  if (grepl('=tryanc', curxlab)) {
-    curxlab <- tail(sq$seq, 1)$community
+  curxlab <- ang$transformation
+  if (grepl('=tryanp', curxlab)) {
+    curxlab <- ang$partitioning
     print(curxlab)
   } else {
-    cat(sq$name, '\n\n')
-    sqtail <- tail(sq$seq, 3)
-#    print(cbind(id=format(sqtail$id, "%R"), sqtail[ ,2:3]), row.names=FALSE)
-    print(tail(sq$seq, 3)[2:3])
+    cat(ang$name, '\n\n')
+    # print(cbind(id=format(sqtail$id, "%R"), sqtail[ ,2:3]), row.names=FALSE)
+    print(tail(summary(sq), 3)[1:2])
     par(mfrow = c(1,1), cex.lab=0.8)
   }
   
   # Plot on requested device
-  ang <- tail(sq$struct, 1)[[1]]
   if (vcount(ang) > 0) {
-
+    
     # Graphics parameters
     plopt <- list(xlab=curxlab, edge.arrow.size=0.2,
       vertex.frame.color=NA, vertex.label.family='sans', edge.label.cex=0.8)
-
-    if (sq$output=='plot') {
+    
+    if (ang$output=='plot') {
       plot.trsq(sq, plopt)      
     } else {
       tkplot(ang, unlist(plopt))
@@ -89,21 +111,21 @@ print.trsq <- function(sq, seed=NA) {
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# TODO: Perhaps by using qgraph instead of igraph)
 
 # Sequence last graph plotting
 plot.trsq <- function(sq, plopt) {
   
-  ang <- tail(sq$struct, 1)[[1]]
-  anc <- tail(sq$seq, 1)$community
+  # TODO: Perhaps by using qgraph instead of igraph)
+  ang <- tail(sq, 1)[[1]]
+  anp <- ang$partitioning
   
   # Output a graph or a graph with community
-  if (is.na(anc)) {
+  if (is.na(anp)) {
     do.call('plot', c(list(ang), plopt))
   } else {
     mship <- V(ang)$membership
-    anc <- make_clusters(ang, as.numeric(factor(mship)))
-    do.call('plot', c(list(anc, ang), plopt))
+    anp <- make_clusters(ang, as.numeric(factor(mship)))
+    do.call('plot', c(list(anp, ang), plopt))
   }
 }
 
@@ -112,9 +134,10 @@ plot.trsq <- function(sq, plopt) {
 ################################################################################
 
 # Explore center candidates
-tryCenters <- function(sq) {
+browseCenters <- function(sq) {
   
-  obs <- get(sq$data)
+  ang <- tail(sq, 1)[[1]]
+  obs <- get(ang$data)
   
   attrobs <- obs[obs$property=='attribute','object']
   
@@ -131,29 +154,27 @@ addCenters <- function(sq, centers, depth=1) {
   trf(sq, 'center', centers=centers, depth=depth, cl=match.call())
 }
 
-# Add centers
-center <- function(ang, anc, dataref, ...) {
-
+# Canonical function call
+center <- function(ang, ...) {
+  
   # Temporary global graph
   tmpang <<- ang
-
+  
   # Specific arguments
   aargs <- list(...)
   centers <- aargs$centers
   depth <- aargs$depth
-
+  
   # Process the vector of center names
-  lapply(centers, function(x) addNeighbor(x, dataref, depth))
-
+  lapply(centers, function(x) addNeighbor(x, depth))
+  
   # Return the updated graph
   tmpang
 }
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 # Add centers and their neighbors
-addNeighbor <- function(center, dataref, depth) {
-
+addNeighbor <- function(center, depth) {
+  
   # add head center if not present
   if (!is.element(center, vertex.attributes(tmpang)$name)) {
     tmpang <<- tmpang + vertices(center, label=center, shape='square', size=15)
@@ -162,7 +183,7 @@ addNeighbor <- function(center, dataref, depth) {
   # add neighbors
   if (depth > 0) {  
     
-    obs <- get(dataref)
+    obs <- get(tmpang$data)
     obs <- obs[obs$property=='link_def', c('object','value')]
     
     # top-down linking of tails
@@ -178,7 +199,7 @@ addNeighbor <- function(center, dataref, depth) {
       
       newhead <- unlist(strsplit(curlink, '>', fixed=TRUE))[1]
       newtail <- unlist(strsplit(curlink, '>', fixed=TRUE))[3]
-      addNeighbor(ifelse(center==newhead, newtail, newhead), dataref, depth-1)
+      addNeighbor(ifelse(center==newhead, newtail, newhead), depth-1)
       
       ange <- get.edgelist(tmpang, names=T)
       anglink <- paste(ange[,1], E(tmpang)$label, ange[,2], sep='>')
@@ -195,7 +216,7 @@ addNeighbor <- function(center, dataref, depth) {
 
 # Retrieve current centers
 getCenters <- function(sq) {
-  ang <- tail(sq$struct, 1)[[1]]
+  ang <- tail(sq, 1)[[1]]
   V(ang)$name[!grepl('>', V(ang)$name)]
 }
 
@@ -204,7 +225,7 @@ getCenters <- function(sq) {
 ################################################################################
 
 # Explore clustering algorithms
-tryBoundaries <- function(sq) {
+browseBoundaries <- function(sq) {
   
   # Available algorithms
   methods <- c('cluster_edge_betweenness','cluster_infomap','cluster_label_prop',
@@ -212,31 +233,32 @@ tryBoundaries <- function(sq) {
   
   # Apply the algorithms
   par(mfrow=c(2,3), cex.lab=1, mar=c(5, 0, 3, 0))
-  lapply(methods, function(tryanc) addBoundary(sq, tryanc))
+  lapply(methods, function(tryanp) applyBoundary(sq, tryanp))
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # User-friendly function call
-addBoundary <- function(sq, community) {
-  trf(sq, 'boundary', anc=community, cl=match.call())
+applyBoundary <- function(sq, partitioning) {
+  trf(sq, 'boundary', partitioning=partitioning, cl=match.call())
 }
 
 # Add boundary
-boundary <- function(ang, anc, dataref, ...) {
+boundary <- function(ang, ...) {
 
   tmpang <<- ang
+  anp <- ang$partitioning
   
-  if (existsFunction(anc)) {
+  if (existsFunction(anp)) {
     
     # Apply community detection algorithm
-    comm <- do.call(anc, list(tmpang))
+    comm <- do.call(anp, list(tmpang))
     V(tmpang)$membership <- comm$membership
   } else {
 
     # Use pregiven communities    
-    obs <- get(dataref)
-    comm <- obs[obs$property==anc, c('object','value')]
+    obs <- get(ang$data)
+    comm <- obs[obs$property==anp, c('object','value')]
     if (nrow(comm)) {
       apply(comm, 1, function(x) {
         
@@ -259,7 +281,7 @@ boundary <- function(ang, anc, dataref, ...) {
 
 # Describe current boundary
 getBoundary <- function(x) {
-  tail(x$seq, 1)$community
+  tail(x, 1)[[1]]$partitioning
 }
 
 ################################################################################
@@ -295,7 +317,7 @@ drillDown <- function(sq, centers=NA, values=FALSE) {
 }
 
 # Add values to centers and/or attributes 
-scale <- function(ang, anc, dataref, ...) {
+scale <- function(ang, anp, dataref, ...) {
 
   # Temporary global graph
   tmpang <<- ang
@@ -367,7 +389,7 @@ addAlternation <- function(sq) {
   trf(sq, 'alternation', cl=match.call())
 }
 
-alternation <- function(ang, anc, dataref, ...) {
+alternation <- function(ang, anp, dataref, ...) {
   
   tmpang <- ang
   
@@ -394,7 +416,7 @@ addSymmetries <- function(sq) {
   trf(sq, 'symmetry', cl=match.call())
 }
 
-symmetry <- function(ang, anc, dataref, ...) {
+symmetry <- function(ang, anp, dataref, ...) {
  
   tmpang <- ang
   
@@ -438,18 +460,11 @@ space <- function(ang, dataref, method, ...) {
 # Somehow create local symmetries, e.g. replicate attribute counts,
 # neighboring centers, etc.
 
-polish <- function(aseq, chkp=NA) {
+applySeed <- function(sq, ...) {
 
 }
 
-polishSeed <- function(aseq, chkp=NA) {
-  
-  ang <- aseq$struct[[length(aseq$struct)]]
-  
-  addAnalysisStep(aseq, match.call(), chkp, ang=ang)
-}
-
-polishLayout <- function(aseq, chkp=NA) {
+roughness <- function(aseq, chkp=NA) {
   
   ang <- aseq$struct[[length(aseq$struct)]]
   
@@ -463,7 +478,7 @@ polishLayout <- function(aseq, chkp=NA) {
 # Fading or transparency based on some measures
 # Remote Centers without attributes as well?
 
-gradient <- function(aseq, chkp=NA) {
+applyGradient <- function(sq, ...) {
   
   ang <- aseq$struct[[length(aseq$struct)]]
   
@@ -514,15 +529,16 @@ group <- function(aseq, member, group, chkp=NA) {
 
 # TODO: Define layouts (colors, lines, shapes) and apply to sequence
 
-style <- function(aseq, center, chkp=NA) {
+applyDesign <- function(sq, ...) {
   
 }
+
 
 ################################################################################
 # SHAPE transformations
 ################################################################################
 
-shape <- function(aseq, center, chkp=NA) {
+applyLayout <- function(sq, ...) {
   
 }
 
@@ -530,7 +546,7 @@ shape <- function(aseq, center, chkp=NA) {
 # SIMPLICITY transformations
 ################################################################################
 
-simplicity <- function(aseq, center, chkp=NA) {
+applySimplicity <- function(sq, ...) {
   
 }
 
@@ -569,7 +585,7 @@ voidAlternation <- function(sq) {
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# TODO: fix if (!is.na(anc)) newtr$community <- ifelse(anc=='remove', NA, anc)
+# TODO: fix if (!is.na(anp)) newtr$community <- ifelse(anp=='remove', NA, anp)
 voidBoundary <- function(aseq, chkp=NA) {
   
 }
@@ -582,6 +598,6 @@ voidBoundary <- function(aseq, chkp=NA) {
 # TODO: Author, version, include data
 
 # Conclude the sequnce
-signoff <- function(aseq, center, chkp=NA) {
+signoff <- function(sq, ...) {
   
 }

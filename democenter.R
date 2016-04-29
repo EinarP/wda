@@ -18,7 +18,7 @@ trdemo
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Center candidates
-tryCenters(trdemo)
+browseCenters(trdemo)
 
 # Create centers
 trdemo <- addCenters(trdemo, 'C01', depth=2)
@@ -31,12 +31,12 @@ getCenters(trdemo)
 
 # Visualize pregiven communities 
 tail(trdemobs[trdemobs$property=='member', ])
-trdemo <- addBoundary(trdemo, community='member')
+trdemo <- applyBoundary(trdemo, partitioning='member')
 trdemo
 
 # Apply community detection algorithm
-tryBoundaries(trdemo)
-trdemo <- addBoundary(trdemo, community='cluster_walktrap')
+browseBoundaries(trdemo)
+trdemo <- applyBoundary(trdemo, partitioning='cluster_walktrap')
 trdemo
 
 # Current clustering
