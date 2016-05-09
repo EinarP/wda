@@ -9,7 +9,7 @@ library(igraph)
 trsq <- function(sqname, trfdata, ...) {
 
   # Empty graph with default settings  
-  ang <- trfattr(graph.empty(), match.call(), name=sqname,
+  ang <- set_trsq_attr(graph.empty(), match.call(), name=sqname,
     data=trfdata, seed=1, output='plot', partitioning=NA, ...)
   
   # Return a list comprised of an empty graph
@@ -22,18 +22,18 @@ trsq <- function(sqname, trfdata, ...) {
 trf <- function(sq, trans, cl, ...) {
   
   # Update the last structure and community definitions
-  ang <- trfattr(tail(sq, 1)[[1]], cl, ...)
+  curang <- set_trsq_attr(tail(sq, 1)[[1]], cl, ...)
 
   # Call the transformation function
-  ang <- do.call(match.fun(trans), args=list(ang, ...))
+  trfang <- do.call(match.fun(trans), args=list(curang, ...))
   
   # Update communities if partitioning present
-  if (!is.na(ang$partitioning) & trans != 'boundary') {
-    curang <- boundary(ang=curang)
+  if (!is.na(trfang$partitioning) & trans != 'boundary') {
+    trfang <- boundary(ang=trfang)
   }
   
   # Expand the structure list
-  sq[[length(sq)+1]] <- ang
+  sq[[length(sq)+1]] <- trfang
    
   # Return the sequence  
   sq
@@ -42,7 +42,7 @@ trf <- function(sq, trans, cl, ...) {
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Internal function for setting tranformation attributes
-trfattr <- function(ang, cl, ...) {
+set_trsq_attr <- function(ang, cl, ...) {
   
   # Mandatory attributes
   ang$dtstamp <- Sys.time()
@@ -134,24 +134,55 @@ plot.trsq <- function(sq, plopt) {
 ################################################################################
 
 # Explore center candidates
-browseCenters <- function(sq) {
+browseSource <- function(type) {
+
+  function(dsrc) {
+      
+  # Connect the data source
+  obs <- get(ifelse(class(dsrc)=='trsq', tail(dsrc, 1)[[1]]$data, dsrc$data))
+
+  # Subset based on object type
+  obsl <- switch(type, 
+    entity=obs[!grepl('>', obs$object), ],
+    attribute=obs[grepl('>', obs$object) & !grepl('\\|', obs$object), ],
+    relationship=obs[grepl('\\|', obs$object), ],
+    all=obs)
   
-  ang <- tail(sq, 1)[[1]]
-  obs <- get(ang$data)
-  
-  attrobs <- obs[obs$property=='attribute','object']
-  
-  linkobs <- strsplit(obs[grepl('link_', obs$property), 'object'], '>')
-  linkobs <- sapply(linkobs, function(x) x[1])
-  
-  sort(unique(c(attrobs, linkobs)))
-}
+  # Tidy up checkpoints for reshaping
+  if (!is.element('checkpoint', names(obsl))) {
+    obsl$checkpoint <- 'all'
+  } else {
+    obsl[is.na(obsl$checkpoint), 'checkpoint'] <- 'all' 
+  }
+    
+  # Convert from long to wide format
+  obsw <- reshape(obsl, direction='wide',
+    idvar=c('object','checkpoint'), timevar='property')
+    
+  # Append helper columns
+  objsplit <- strsplit(sub('\\|', '>', obsw$object), '>', fixed=TRUE)
+  obsw$objsrc <- sapply(objsplit, function(x) x[1])
+  obsw$objattr <- sapply(objsplit, function(x) x[2])
+  obsw$objdest <- sapply(objsplit, function(x) x[3])
+
+  # Return observations in wide format
+  names(obsw) <- gsub('value.', '', names(obsw))
+  obsw[with(obsw, order(object, checkpoint)), ]
+  }
+}  
+
+browseCenters <- browseSource('all')
+browseEntities <- browseSource('entity')
+browseAttributes <- browseSource('attribute')
+browseRelationships <- browseSource('relationship')
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # User-friendly function call
-addCenters <- function(sq, centers, depth=1) {
-  trf(sq, 'center', centers=centers, depth=depth, cl=match.call())
+addCenters <- function(sq, centers, depth=1, addelem=FALSE, addval=FALSE) {
+  
+  trf(sq, 'center', cl=match.call(),
+    centers=centers, depth=depth, addelem=addelem, addval=addval)
 }
 
 # Canonical function call
@@ -159,65 +190,129 @@ center <- function(ang, ...) {
   
   # Temporary global graph
   tmpang <<- ang
-  
-  # Specific arguments
+
+  # Arbitrary attributes
   aargs <- list(...)
-  centers <- aargs$centers
-  depth <- aargs$depth
   
   # Process the vector of center names
-  lapply(centers, function(x) addNeighbor(x, depth))
-  
+  lapply(aargs$centers, function(x)
+    add_entities(x, aargs$depth, addelem=aargs$addelem, addval=aargs$addval))
+
   # Return the updated graph
   tmpang
 }
 
 # Add centers and their neighbors
-addNeighbor <- function(center, depth) {
+add_entities <- function(center, depth, addelem, addval) {
   
   # add head center if not present
-  if (!is.element(center, vertex.attributes(tmpang)$name)) {
+  if (!is.element(center, V(tmpang)$name)) {
+    
+    # TODO: size related to space, if not present use center type defults
     tmpang <<- tmpang + vertices(center, label=center, shape='square', size=15)
   }
   
-  # add neighbors
+  # Add attributes and values
+  if (addelem) add_attributes(tmpang, center, addval)
+  if (addval) add_values(tmpang, center)
+  
+  # add neighboring entities
   if (depth > 0) {  
-    
-    obs <- get(tmpang$data)
-    obs <- obs[obs$property=='link_def', c('object','value')]
-    
-    # top-down linking of tails
-    tailc <- obs[grep(paste0(center, '>'), obs$object), ]
-    linkspec <- paste(tailc$object, tailc$value, sep='>')
-    
-    # bottom-up linking of tails
-    tailc <- obs[obs$value==center, ]
-    linkspec <- c(linkspec, paste(tailc$object, tailc$value, sep='>'))
-    
-    # add tail center and link head to tail
-    lapply(linkspec, function(curlink) {
+
+    obs <- browseRelationships(tmpang)
+    linkspec <- obs[obs$objsrc==center | obs$objdest==center, ]
+    apply(linkspec, 1, function(clnk) {
       
-      newhead <- unlist(strsplit(curlink, '>', fixed=TRUE))[1]
-      newtail <- unlist(strsplit(curlink, '>', fixed=TRUE))[3]
-      addNeighbor(ifelse(center==newhead, newtail, newhead), depth-1)
-      
-      ange <- get.edgelist(tmpang, names=T)
-      anglink <- paste(ange[,1], E(tmpang)$label, ange[,2], sep='>')
-      if (!is.element(curlink, anglink)) {
-        newlink <- unlist(strsplit(curlink, '>', fixed=TRUE))[2]
-        tmpang <<- tmpang + edge(newhead, newtail,
-          label=newlink, edge.arrow.size=0.2, arrow.mode=2)
+      nextcenter <- ifelse(clnk['objsrc']==center, clnk['objdest'], clnk['objsrc'])
+      add_entities(nextcenter, depth-1, addelem, addval)
+
+      if (!is.element(clnk['object'], E(tmpang)$id)) {
+        tmpang <<- tmpang + edge(clnk['objsrc'], clnk['objdest'], 
+          id=clnk['object'], label=clnk['objattr'], edge.arrow.size=0.2, arrow.mode=2, width=1)
       }
     })
   }
+}
+
+# Add elements
+add_attributes <- function(ang, centers, addval) {
+  
+  # Temporary global graph
+  tmpang <<- ang
+  
+  obs <- browseAttributes(tmpang)
+  attrspec <- obs[is.element(obs$objsrc, centers), ]
+  
+  if (nrow(attrspec)) {
+    apply(attrspec, 1, function(cattr) {
+      if (!is.element(cattr['object'], V(tmpang)$name)) {
+        tmpang <<- tmpang + vertices(cattr['object'], label=cattr['objattr'], 
+          shape='circle', size=5)
+        
+        tmpang <<- tmpang + edge(cattr['objsrc'], cattr['object'], 
+          id=cattr['object'], label=NA, arrow.mode=0, width=1)
+      }
+      
+      if (addval) add_values(tmpang, cattr['object'])
+    })
+  }
+  
+  tmpang
+}
+
+# Add values
+add_values <- function(ang, centers) {
+
+  obs <- browseCenters(ang)
+  valuespec <- obs[!is.na(obs$value), ]
+  if (nrow(valuespec)) {
+    apply(valuespec, 1, function(cval) {
+      if (is.element(cval['object'], centers)) {
+        
+        curlabel <- V(tmpang)$label[V(tmpang)$name==cval['object']]
+        curlabel <- unlist(strsplit(curlabel, '=', fixed=TRUE))[1]
+        newlabel <- paste0(curlabel, '=', cval['value'])
+        
+        tmpang <<- set_vertex_attr(tmpang, 'label',
+          index=V(tmpang)$name==cval['object'], value=newlabel)
+      }
+    })
+  }
+  
+  tmpang
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Retrieve current centers
 getCenters <- function(sq) {
+  
   ang <- tail(sq, 1)[[1]]
-  V(ang)$name[!grepl('>', V(ang)$name)]
+  
+  ent <- V(ang)$name[!grepl('>', V(ang)$name)]
+  elem <- V(ang)$name[grepl('>', V(ang)$name)]
+  
+  vals <- grepl('=', V(ang)$label)
+  val <- as.data.frame(list(center=V(ang)$name[vals], value=V(ang)$label[vals]))
+  
+  
+  # Return list of entities, elements, values
+  list(entities=ent, elements=elem, values=val)
+}
+
+# Retrieve current attributes
+getAttributes <-function(sq) {
+  ang <- tail(sq$struct, 1)[[1]]
+  V(ang)$name[grepl('>', V(ang)$name)]
+}
+
+# Retrieve current values
+getValues <-function(sq) {
+  
+  ang <- tail(sq$struct, 1)[[1]]
+  
+  values <- grepl('=', V(ang)$label)
+  as.data.frame(list(center=V(ang)$name[values], attrvalue=V(ang)$label[values]))
 }
 
 ################################################################################
@@ -238,43 +333,46 @@ browseBoundaries <- function(sq) {
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# User-friendly function call
+# User-friendly function call for partitioning
 applyBoundary <- function(sq, partitioning) {
   trf(sq, 'boundary', partitioning=partitioning, cl=match.call())
+}
+
+# User-friendly function call for removing partitioning
+removeBoundary <- function(sq) {
+  trf(sq, 'boundary', partitioning=NA, cl=match.call())
 }
 
 # Add boundary
 boundary <- function(ang, ...) {
 
-  tmpang <<- ang
   anp <- ang$partitioning
   
-  if (existsFunction(anp)) {
+  if (is.na(anp)) {
     
-    # Apply community detection algorithm
-    comm <- do.call(anp, list(tmpang))
-    V(tmpang)$membership <- comm$membership
+    # Remove partitioning
+    V(ang)$membership <- NA
   } else {
-
-    # Use pregiven communities    
-    obs <- get(ang$data)
-    comm <- obs[obs$property==anp, c('object','value')]
-    if (nrow(comm)) {
-      apply(comm, 1, function(x) {
-        
-        # Center
-        tmpang <<- set_vertex_attr(tmpang, 'membership',
-          index=V(ang)$name==x[1], value=x[2])
-        
-        # Center attributes
-        tmpang <<- set_vertex_attr(tmpang, 'membership',
-          index=grepl(paste0(x[1], '>'), V(tmpang)$name), value=x[2])
-      })
+  
+    if (existsFunction(anp)) {
+    
+      # Apply community detection algorithm
+      comm <- do.call(anp, list(ang))
+      V(ang)$membership <- comm$membership
     } else {
-      stop('No memberships pregiven.')
+
+      # Use pregiven communities    
+      obs <- browseCenters(ang)
+      comm <- obs[!is.na(obs[ ,anp]), c('object',anp)]
+      if (nrow(comm)) {
+        ents <- obs[match(V(ang)$name, obs$object), 'objsrc']
+        V(ang)$membership <- comm[match(ents, comm$object), 'member']
+      } else {
+        stop('No memberships pregiven.')
+      }
     }
   }
-  tmpang
+  ang
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -288,88 +386,17 @@ getBoundary <- function(x) {
 # SCALE transformations
 ################################################################################
 
-# Explore attribute candidates
-tryAttributes <- function(sq, centers=NA) {
-
-  obs <- get(sq$data)
-  if (!is.na(centers[1])) obs <- obs[obs$object==centers, ]
-  
-  attrobs <- with(obs[obs$property=='attribute', ], paste(object, value, sep='>'))
-  linkobs <- obs[grepl('link_', obs$property), 'object']
-  
-  sort(unique(c(attrobs, linkobs)))
-}
-
-# Explore value candidates
-tryValues <- function(sq, centers=NA) {
-  
-  obs <- get(sq$data)
-  if (!is.na(centers[1])) obs <- obs[obs$object==centers, ]
-  
-  obs[obs$property=='value', c('object','value')]
-}
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # User-friendly function call
-drillDown <- function(sq, centers=NA, values=FALSE) {
+applyScale <- function(sq, centers=NA, values=FALSE) {
     trf(sq, 'scale', centers=centers, values=values, cl=match.call())
 }
 
-# Add values to centers and/or attributes 
-scale <- function(ang, anp, dataref, ...) {
-
-  # Temporary global graph
-  tmpang <<- ang
-
-  # Specific arguments
-  aargs <- list(...)
-  centers <- aargs$centers
-  values <- aargs$values
+scale <- function(ang, ...) {
   
-  obs <- get(dataref)
-  
-  # Add attributes
-  attrspec <- obs[is.element(obs$object, centers) & obs$property=='attribute', ]
-  apply(attrspec, 1, function(x) {
-    aname <- paste(x[1], x[3], sep='>')
-    if (!is.element(aname, vertex.attributes(tmpang)$name)) {
-      tmpang <<- tmpang + vertices(aname, label=x[3], shape='circle', size=5)
-      tmpang <<- tmpang + edge(x[1], aname, label=NA, arrow.mode=0)
-    }
-  })
-  
-  # Add values
-  if (values) {
-    valuespec <- obs[obs$property=='value', ]
-    apply(valuespec, 1, function(x) {
-      curcenter <- unlist(strsplit(x[1], '>', fixed=TRUE))[1]
-      if (is.element(curcenter, centers)) {
-        newlabel <- paste0(V(tmpang)$label[V(tmpang)$name==x[1]],  '=', x[3])
-        tmpang <<- set_vertex_attr(tmpang, 'label',
-          index=V(tmpang)$name==x[1], value=newlabel)
-      }
-    })
-  }
-  tmpang
+  ang
 }
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-# Retrieve current attributes
-getAttributes <-function(sq) {
-  ang <- tail(sq$struct, 1)[[1]]
-  V(ang)$name[grepl('>', V(ang)$name)]
-}
-
-# Retrieve current values
-getValues <-function(sq) {
-  
-  ang <- tail(sq$struct, 1)[[1]]
-  
-  values <- grepl('=', V(ang)$label)
-  as.data.frame(list(center=V(ang)$name[values], attrvalue=V(ang)$label[values]))
-}
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -389,19 +416,22 @@ addAlternation <- function(sq) {
   trf(sq, 'alternation', cl=match.call())
 }
 
-alternation <- function(ang, anp, dataref, ...) {
+removeAlternation <- function(sq) {
+  tail(trdemo$struct, 1)[[1]] 
+}
+
+alternation <- function(ang, ...) {
   
   tmpang <- ang
   
   tmpang
 }
 
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Get current alternation status
 getAlternation <- function(sq) {
-  ang <- tail(sq$struct, 1)[[1]]
+  ang <- tail(sq, 1)[[1]]
   is.bipartite(ang)
 }
 
@@ -416,7 +446,7 @@ addSymmetries <- function(sq) {
   trf(sq, 'symmetry', cl=match.call())
 }
 
-symmetry <- function(ang, anp, dataref, ...) {
+symmetry <- function(ang, ...) {
  
   tmpang <- ang
   
@@ -427,31 +457,66 @@ symmetry <- function(ang, anp, dataref, ...) {
 # SPACE transformations
 ################################################################################
 
-addSpace <- function(sq, method=NA) {
+applySizing <- function(sq, method=NA) {
   trf(sq, 'space', method=method, cl=match.call())
 }
 
-# Somehow create local symmetries, e.g. replicate attribute counts,
-# neighboring centers, etc.
+space <- function(ang, ...) {
 
-#TODO: replace add with apply prefix if not adding new elements
-space <- function(ang, dataref, method, ...) {
+  aargs <- list(...)
+  method <- aargs$method
+  
+  if (is.na(method)) {
+    ang <- space_pregiven(ang)
+  } else {
 
-  if (!is.na(method)) {
-  # TODO: If algorithmic convert to center-only graph (function?) 
-    tmpang <- alternation(ang, remove=TRUE)
-    tmpang <- void(tmpang, getAttributes(ang))
+    # Calculate sizes
+    #  V(ang)$size <- sample(10:20, length(V(ang)), replace=TRUE)
+    
+    # TODO: If algorithmic convert to center-only graph (function?) 
+    
+    #tmpang <- alternation(ang, remove=TRUE)
+    #tmpang <- void(tmpang, getAttributes(ang))
+    
+    btw <- betweenness(ang) + 3
+    V(ang)$size <- btw
+    
+    E(ang)$width <- sample(1:5, length(E(ang)), replace=TRUE)
+    E(ang)$arrow.size <- E(ang)$width^2
   }
-  
-#  V(ang)$size <- sample(10:20, length(V(ang)), replace=TRUE)
-  btw <- betweenness(ang) + 3
-  V(ang)$size <- btw
-  
-  E(ang)$width <- sample(1:5, length(E(ang)), replace=TRUE)
-  E(ang)$arrow.size <- E(ang)$width^2
   
   ang
 }
+
+# Apply pregiven sizes
+space_pregiven <- function(ang) {
+  
+  obs <- browseCenters(ang)
+  sizing <- obs[!is.na(obs$size), ]
+
+  for (idx in seq_along(sizing$object)) {
+    cname <- sizing[idx,'object']
+    csize <- as.numeric(sizing[idx,'size'])
+
+    # Resize vertices
+    if (is.na(sizing[idx,'objdest'])) {
+      ang <- set_vertex_attr(ang, 'size', index=V(ang)$name==cname, value=csize)  
+    } else {
+      ang <- set_edge_attr(ang, 'width', index=E(ang)$id==cname, value=csize)
+    }
+  }  
+  
+  # Resize edges (one for loop probably sufficient)
+#  esizing <- sizing[grepl('>', sizing$object), ]
+#  for (idx in seq_along(esizing$object)) {
+#    ename <- gsub('>', '|', esizing[idx,'object'])
+#    esize <- as.numeric(esizing[idx,'value'])
+#    ang <- set_edge_attr(ang, 'width', index=E(ang)[ename], value=esize)
+#  }  
+  
+  ang  
+}
+
 
 ################################################################################
 # ROUGHNESS transformations
@@ -468,7 +533,7 @@ roughness <- function(aseq, chkp=NA) {
   
   ang <- aseq$struct[[length(aseq$struct)]]
   
-  addAnalysisStep(aseq, match.call(), chkp, ang=ang)
+  ang
 }
 
 ################################################################################
@@ -481,8 +546,8 @@ roughness <- function(aseq, chkp=NA) {
 applyGradient <- function(sq, ...) {
   
   ang <- aseq$struct[[length(aseq$struct)]]
-  
-  addAnalysisStep(aseq, match.call(), chkp, ang=ang)
+
+  ang
 }
 
 ################################################################################
@@ -564,32 +629,19 @@ voidCenter <- function(sq, centers) {
 
 void <- function(ang, ...) {
   
-    # Specific arguments
+  # Specific arguments
   aargs <- list(...)
   centers <- aargs$centers
 
-  ang <- delete.vertices(tmpang, centers)
+  ang <- delete.vertices(ang, centers)
   
-  #TODO: Void related attributes if any
+  # Delete attributes
+  obs <- browseCenters(ang)
+  ang <- delete.vertices(ang, 
+    is.element(obs[match(V(ang)$name, obs$object), 'objsrc'], centers))
   
   ang
 }
-
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-# Either belongs to alternation transformation or calls alternation from here
-voidAlternation <- function(sq) {
-  tail(trdemo$struct, 1)[[1]] 
-}
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-# TODO: fix if (!is.na(anp)) newtr$community <- ifelse(anp=='remove', NA, anp)
-voidBoundary <- function(aseq, chkp=NA) {
-  
-}
-
 
 ################################################################################
 # NOT-SEPARATENESS transformations

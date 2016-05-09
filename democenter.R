@@ -3,7 +3,9 @@
 source('func.R')
 
 # Sample data loading
-trdemobs <- read.csv('../data/trdemo.csv', stringsAsFactors=FALSE)
+# trdemobs <- read.csv('../data/trdemo.csv', stringsAsFactors=FALSE)
+library(openxlsx)
+trdemobs <- read.xlsx('../data/trdemo.xlsx')
 
 # Structure of sample data
 str(trdemobs)
@@ -18,7 +20,7 @@ trdemo
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Center candidates
-browseCenters(trdemo)
+browseEntities(trdemo)
 
 # Create centers
 trdemo <- addCenters(trdemo, 'C01', depth=2)
@@ -44,19 +46,23 @@ getBoundary(trdemo)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Possible attributes
-tryAttributes(trdemo)
+# Possible elements
+browseAttributes(trdemo)
+browseRelationships(trdemo)
 
-# Possible values
-tryValues(trdemo)
-
-# Add all attributes and values
-attrCenters <- unique(trdemobs[trdemobs$property=='attribute', 'object'])
-trdemo <- drillDown(trdemo, attrCenters, values=TRUE)
+# Add certain elements
+trdemo <- addCenters(trdemo, c('C01','C02'), depth=0, addelem=TRUE)
 trdemo
 
-# Current attributes and values
+# Possible values
+browseCenters(trdemo)$values
 
+# Add certain values
+trdemo <- addCenters(trdemo, 'C01', depth=0, addelem=TRUE, addval=TRUE)
+trdemo
+
+# Current centers
+getCenters(trdemo)
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Alternation
@@ -74,9 +80,9 @@ trdemo
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Space
-
+applySizing(trdemo)
 # Power centrality calculation (TODO: integrate with sp)
-power_centrality(trdemo$struct[[length(trdemo$struct)]])
+# power_centrality(trdemo$struct[[length(trdemo$struct)]])
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -114,7 +120,7 @@ power_centrality(trdemo$struct[[length(trdemo$struct)]])
 
 # Void: Remove clutter
 
-trdemo <- voidCenter(trdemo, 'C04')
+trdemo <- voidCenter(trdemo, c('C02','C07'))
 trdemo
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
