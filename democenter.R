@@ -19,26 +19,32 @@ trdemo
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Center candidates
-browseEntities(trdemo)
+# Source data
+head(browseData(trdemo), 3)
+tail(browseData(trdemo), 3)
 
-# Create centers
+# Create the initial structure
 trdemo <- addCenters(trdemo, 'C01', depth=2)
 trdemo
 
-# List current centers
+# Add attributes and values to certain entities
+trdemo <- addCenters(trdemo, c('C01','C02'), depth=0, addelem=TRUE, addval=TRUE)
+trdemo
+
+# Existing centers and their connections
 getCenters(trdemo)
+getRelations(trdemo)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-# Visualize pregiven communities 
-tail(trdemobs[trdemobs$property=='member', ])
-trdemo <- applyBoundary(trdemo, partitioning='member')
-trdemo
 
 # Apply community detection algorithm
 browseBoundaries(trdemo)
 trdemo <- applyBoundary(trdemo, partitioning='cluster_walktrap')
+trdemo
+
+# Visualize pregiven communities 
+browseEntities(trdemo)[ ,c('object', 'member')]
+trdemo <- applyBoundary(trdemo, partitioning='member')
 trdemo
 
 # Current clustering
@@ -46,29 +52,30 @@ getBoundary(trdemo)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Possible elements
-browseAttributes(trdemo)
-browseRelationships(trdemo)
+# Global scaling settings
+getScaling(trdemo)
 
-# Add certain elements
-trdemo <- addCenters(trdemo, c('C01','C02'), depth=0, addelem=TRUE)
+# Sample of sizing information
+browseData(trdemo)[sample(1:nrow(browseData(trdemo)), 6), c('object','size')]
+
+# Scaling by pregiven sizes
+trdemo <- applyScale(trdemo, values=3)
 trdemo
 
-# Possible values
-browseCenters(trdemo)$values
+# Scaling by pregiven sizes
 
-# Add certain values
-trdemo <- addCenters(trdemo, 'C01', depth=0, addelem=TRUE, addval=TRUE)
-trdemo
+# Global scaling settings after transformations
+getScaling(trdemo)
 
-# Current centers
-getCenters(trdemo)
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Alternation
 getAlternation(trdemo)
-trdemo <- addAlternation(trdemo)
+trdemo <- applyAlternation(trdemo)
 getAlternation(trdemo)
+trdemo
+
+trdemo <- removeAlternation(trdemo)
 trdemo
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -80,13 +87,16 @@ trdemo
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Space
-applySizing(trdemo)
+trdemo <- applySizing(trdemo)
 # Power centrality calculation (TODO: integrate with sp)
 # power_centrality(trdemo$struct[[length(trdemo$struct)]])
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Roughness
+browseSeeds(trdemo)
+trdemo <- applySeed(trdemo, seed=543)
+trdemo
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

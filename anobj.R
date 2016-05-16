@@ -16,7 +16,8 @@ anobj <- trsq('Analysis object', 'anobs')
 # Create centers
 anobj <- addCenters(anobj, 'SEQUENCE', depth=2)
 
-# Partition
+# Apply appropriate seed and partition
+anobj <- applySeed(sq=anobj, seed=163)
 anobj <- applyBoundary(anobj, 'member')
 anobj
 
@@ -27,5 +28,8 @@ anobj
 anobj <- voidCenter(anobj, c('REPORT','STORAGE'))
 anobj <- addCenters(anobj, c('VERTEX','EDGE'), depth=1, addelem=TRUE)
 
-applySizing(anobj)
+anobj <- applySizing(anobj)
+anobj
+
+anobj <- addAlternation(anobj)
 anobj
