@@ -6,8 +6,6 @@ output:
 This is analysis of LD module structure for understanding its loan schedule handling mechanisms
 
 ```{r message=FALSE}
-library(igraph)
-
 #Common functions
 source('func.R')
 

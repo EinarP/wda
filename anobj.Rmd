@@ -1,0 +1,70 @@
+---
+title: "anobj"
+output: html_document
+---
+Progression of the analysis has a certain structure. This stucture might contain trees, circles, loops, etc. Herein we limit the structure to a simple sequence
+
+```{r message=FALSE}
+# Common functions
+source('func.R')
+
+# Input data
+library(readxl)
+anobs <- read_excel('../data/anobj.xlsx')
+
+# Structure of sample data
+str(anobs)
+
+# Summary of properties
+table(anobs$property)
+
+# Initialize the analysis sequence
+anobj <- trsq('Analysis object', 'anobs')
+```
+
+## Analysis object context
+
+### checkpoints
+
+addCenters: select obs with either equal to ckpt or null ckpt
+voidCenters: if ckpt specified remove all not equal to ckpt or null ckpt
+
+```{r}
+# Create centers
+anobj <- addCenters(anobj, 'SEQUENCE', depth=2, ckpt='context')
+
+# Apply appropriate seed and partition
+anobj <- applySeed(sq=anobj, seed=163)
+anobj <- applyBoundary(anobj, 'mbrp')
+anobj
+```
+
+## Analysis object detailed view
+
+```{r}
+
+anobj <- addCenters(anobj, 'GRAPH', attrs=T, vals=T, ckpt='details')
+anobj <- applySizing(anobj)
+anobj <- applySeed(sq=anobj, seed=747)
+anobj
+
+# anobj <- applyAlternation(anobj)
+#anobj
+```
+
+## Analysis object final view [CKPT=Final]
+
+To illustrate the timeline
+
+```{r}
+
+#anobj <- voidCenter(anobj, c('REPORT','STORAGE'))
+
+```
+
+## Analysis object overview
+
+```{r}
+
+```
+
