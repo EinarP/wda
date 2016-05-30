@@ -8,7 +8,6 @@
     $INSERT I_F.STANDARD.SELECTION
 
 * TODO: Parameters: scan=x, ckpt=y
-* TODO: Local/core partitioning criteria, e.g. 'CAS.','EB.NAMA','EB.ARREAR','COB.'
 
     GOSUB INITIALISE
 
