@@ -6,11 +6,12 @@ library(igraph)
 ################################################################################
 
 # Contruct the transformations sequence object
-trsq <- function(sqname, trfdata, ...) {
+trsq <- function(name, data, ...) {
 
   # Empty graph with default settings  
-  ang <- set_trsq_attr(graph.empty(), match.call(), name=sqname, seed=1, 
-    data=trfdata, output='plot', partitioning=NA, alternation=FALSE, ...)
+  ang <- set_trsq_attr(graph.empty(), match.call(), name=name, data=data,  
+    output='plot', checkpoint=NA, partitioning=NA, alternation=FALSE, 
+    seed=1, ...)
   
   # Return a list comprised of an empty graph
   structure(list(ang), class='trsq')
@@ -208,6 +209,10 @@ browseSource <- function(type) {
     # Convert from long to wide format
     obsw <- reshape(obsl, direction='wide',
       idvar=c('object','checkpoint'), timevar='property')
+
+    # Concert weights to numeric
+    wtcol <- grep('wt_', names(obsw))
+    obsw[ ,wtcol] <- apply(obsw[ ,wtcol], 2, as.numeric)
     
     # Append helper columns
     objsplit <- strsplit(sub('\\|', '>', obsw$object), '>', fixed=TRUE)
@@ -231,7 +236,7 @@ browseRelations <- browseSource('relationship')
 # TODO: Introduce 'type' attr for differentiating entities and attributes
 
 # User-friendly function call
-addCenters <- function(sq, cntr, depth=1, attrs=FALSE, vals=FALSE, ckpt=NULL) {
+addCenters <- function(sq, cntr, depth=1, attrs=FALSE, vals=FALSE, ckpt=NA) {
   
   trf(sq, 'center', cl=match.call(), centers=cntr,
     depth=depth, attrs=attrs, vals=vals, checkpoint=ckpt)
@@ -270,19 +275,15 @@ add_entities <- function(center, depth, attrs, vals) {
   
   # add neighboring entities
   if (depth > 0) {  
-
     obs <- browseRelations(tmpang)
     linkspec <- obs[obs$objsrc==center | obs$objdest==center, ]
-    apply(linkspec, 1, function(clnk) {
-      
-      nextcenter <- ifelse(clnk['objsrc']==center, clnk['objdest'], clnk['objsrc'])
-      add_entities(nextcenter, depth-1, attrs, vals)
-      tmpang <<- add_link(tmpang, clnk['objsrc'], clnk['objdest'], clnk['objattr'])
-#      if (!is.element(clnk['object'], attr(E(tmpang), 'vnames'))) {
-#        tmpang <<- tmpang + edge(clnk['objsrc'], clnk['objdest'], 
-#          label=clnk['objattr'], edge.arrow.size=0.2, arrow.mode=2, width=1)
-#      }
-    })
+    if (nrow(linkspec) > 0) {
+      apply(linkspec, 1, function(clnk) {
+        nextcenter <- ifelse(clnk['objsrc']==center, clnk['objdest'], clnk['objsrc'])
+        add_entities(nextcenter, depth-1, attrs, vals)
+        tmpang <<- add_link(tmpang, clnk['objsrc'], clnk['objdest'], clnk['objattr'])
+      })
+    }
   }
 }
 
@@ -669,6 +670,8 @@ contrast <- function(aseq, chkp=NA) {
 # INTERLOCK transformations
 ################################################################################
 
+# Can be useful for handling repeating blocks like audit fields
+
 # Group centers and attributes to logical units
 group <- function(aseq, member, group, chkp=NA) {
   
@@ -713,6 +716,8 @@ applyLayout <- function(sq, ...) {
 # SIMPLICITY transformations
 ################################################################################
 
+# Non-essential sans names? etc in the background
+
 applySimplicity <- function(sq, ...) {
   
 }
@@ -724,7 +729,7 @@ applySimplicity <- function(sq, ...) {
 ################################################################################
 
 # Remove centers
-voidCenters <- function(sq, centers=NULL, ckpt=NULL) {
+voidCenters <- function(sq, centers=NULL, ckpt=NA) {
   trf(sq, 'void', centers=centers, checkpoint=ckpt, cl=match.call())
 }
 

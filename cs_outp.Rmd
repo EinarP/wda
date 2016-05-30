@@ -3,26 +3,49 @@ title: "cs"
 output: word_document
 ---
 ```{r}
-#Load observations file
-obs <- read.csv('data/obs.csv', stringsAsFactors=FALSE)
+# Load observations
+library(readxl)
+t24obs <- read_excel('../data/t24.xlsx')
 
-#Observations data frame structure
-str(obs, width=60, strict.width='cut')
+# Observations data frame structure
+str(t24obs, width=70, strict.width='cut')
 
 #Summary of object properties observed
-table(obs$property)
+table(t24obs$property)
 
 #Sample observations of each property
-t(sapply(unique(obs$property), function(x) {
-  sobs <- obs[obs$property==x,]; sobs[1, ] }))
+sobs <- t(sapply(unique(t24obs$property), function(x) {
+  sobs <- t24obs[t24obs$property==x,]; sobs[sample(1:nrow(sobs), 1), ] }))
+
+print(as.data.frame(sobs), row.names=FALSE)
 ```
 
-#data observations
-nobs <- 100
+# Exploratory analysis
+```{r}
+# Common functions
+source('func.R')
 
-dtstamp <- seq(from=Sys.time(), length.out=nobs, by='mins')
-object <- sample(c('obj1', 'obj2', 'obj3', 'obj4'), nobs, replace=TRUE)
-property <- sample(c('prop1', 'prop2', 'prop3', 'prop4'), nobs, replace=TRUE)
-value <- rnorm(nobs)
+t24 <- trsq('vizgraph', 't24obs')
+obsw <- browseData(t24)
 
-obs <- data.frame(dtstamp, object, property, value)
+# Fix membership plots: combine module detection errors
+obsw[grepl('ERR_', obsw$mbrp_module), 'mbrp_module'] <- '?'
+ 
+# Display possibly not used portion in local/core membership
+
+
+par(mfrow=c(4,2), mar=c(3,2,6,1), oma=c(1,1,2,0))
+with(obsw, {
+  barplot(table(mbrp_module), space=0, main='Membership: module')
+  barplot(table(mbrp_localcore), main='Membership: local/core')
+  hist(wt_numattr, breaks=20, main="Number of attributes")
+  hist(obsw[wt_numrec > 1000, 'wt_numrec'], breaks=20, main="Number of records")
+  hist(wt_volattr, main="Attibute size")
+  hist(wt_fillattr, main="Attribute completeness")
+  hist(wt_volrec, main="Record size")
+  hist(wt_fillrec, main='Record completeness')
+})
+mtext("Summary of Data Observations", outer=TRUE, cex=1.3)
+
+```
+
