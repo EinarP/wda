@@ -1,13 +1,15 @@
 *------------------------------------------------------------------------------
 * <Rating>-80</Rating>
 *------------------------------------------------------------------------------
-    SUBROUTINE EPSS
-
+    SUBROUTINE EPSS(ldev, scan, ckpt)
+*------------------------------------------------------------------------------
+* ldev : local development prefixes array
+* scan : string to be scanned
+* ckpt : checkpoint to be recorded
+*------------------------------------------------------------------------------
     $INSERT I_COMMON
     $INSERT I_EQUATE
     $INSERT I_F.STANDARD.SELECTION
-
-* TODO: Parameters: scan=x, ckpt=y
 
     GOSUB INITIALISE
 
@@ -27,6 +29,7 @@
         END
     NEXT app_idx
 
+* TODO: Append in case of scanning for changes?
     CALL OPF('&HOLD&', F.HOLD)
     WRITE outp TO F.HOLD,'t24.csv'
 
@@ -36,6 +39,7 @@
 *-------------------------------------------------------------------------------
 GET.MEMBERSHIP:
 
+* Modularization of the system
     FIND ssList<app_idx> IN pgmFileList SETTING fpos,vpos THEN
         curm = pgmFileList<fpos,2>
         IF NOT(curm) THEN
@@ -50,6 +54,9 @@ GET.MEMBERSHIP:
     END
 
     outp<-1> = ssList<app_idx>:',mbrp,':curm
+
+* Division to core and local development
+
 
     RETURN
 *-------------------------------------------------------------------------------
