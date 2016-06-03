@@ -6,12 +6,17 @@ library(igraph)
 ################################################################################
 
 # Contruct the transformations sequence object
-trsq <- function(name, data, ...) {
+newsq <- function(name, data, ...) {
 
   # Empty graph with default settings  
-  ang <- set_trsq_attr(graph.empty(), match.call(), name=name, data=data,  
-    output='plot', checkpoint=NA, partitioning=NA, alternation=FALSE, 
-    seed=1, ...)
+  ang <- set_trsq_attr(graph.empty(), match.call(),
+                       
+    # General (sequence or multi-step) metadata
+    name=name, data=data, checkpoint=NA, output='plot',
+    
+    # Global properties
+    partitioning=NA, scaling=NA, alternation=FALSE, symmetry=NA, sizing=NA,
+    seed=1, gradient=FALSE, design=NA, layout=NA, simplicity=FALSE, ...)
   
   # Return a list comprised of an empty graph
   structure(list(ang), class='trsq')
@@ -77,7 +82,7 @@ apply_checkpoint <- function(ang) {
   
   # Remove vertices
   cntr <- getCenters(ang)$name
-  ang <- void(ang, centers=cntr[!(cntr %in% ckptobs$object)])
+  ang <- thevoid(ang, centers=cntr[!(cntr %in% ckptobs$object)])
 
   # TODO: Adjust vertex values
   
@@ -143,7 +148,12 @@ print.trsq <- function(sq, seed=NA) {
   if (vcount(ang) > 0) {
     
     # Graphics parameters
-    plopt <- list(xlab=curxlab, edge.arrow.size=0.2,
+     # layout <- layout.reingold.tilford(ang, circular=T)
+    #layout <- layout.fruchterman.reingold(ang, niter=10000)
+    # layout <- layout_as_star(ang)
+    # layout <- layout_on_grid(ang)
+    layout <- layout_nicely(ang) 
+    plopt <- list(xlab=curxlab, edge.arrow.size=0.2, layout=layout,
       vertex.frame.color=NA, vertex.label.family='sans', edge.label.cex=0.8)
     
     if (ang$output=='plot') {
@@ -235,14 +245,14 @@ browseRelations <- browseSource('relationship')
 
 # TODO: Introduce 'type' attr for differentiating entities and attributes
 
-# User-friendly function call
-addCenters <- function(sq, cntr, depth=1, attrs=FALSE, vals=FALSE, ckpt=NA) {
+# User friendly transformation function call
+grow <- function(sq, cntr, depth=1, attrs=FALSE, vals=FALSE, ckpt=NA) {
   
   trf(sq, 'center', cl=match.call(), centers=cntr,
     depth=depth, attrs=attrs, vals=vals, checkpoint=ckpt)
 }
 
-# Transformation function
+# Adding centers: entities, attributes, relations, values
 center <- function(ang, ...) {
   
   # Temporary global graph
@@ -399,7 +409,7 @@ getRelations <- function(sq) {
 ################################################################################
 
 # Explore clustering algorithms
-browseBoundaries <- function(sq) {
+browsePartitionings <- function(sq) {
   
   # Available algorithms
   methods <- c('cluster_edge_betweenness','cluster_label_prop',
@@ -407,18 +417,18 @@ browseBoundaries <- function(sq) {
   
   # Apply the algorithms
   par(mfrow=c(2,3), cex.lab=1, mar=c(5, 0, 3, 0))
-  lapply(methods, function(tryanp) applyBoundary(sq, tryanp))
+  lapply(methods, function(tryanp) applyPartitioning(sq, tryanp))
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# User-friendly function call for partitioning
-applyBoundary <- function(sq, partitioning) {
+# User friendly transformation function call for partitioning
+applyPartitioning <- function(sq, partitioning) {
   trf(sq, 'boundary', partitioning=partitioning, cl=match.call())
 }
 
-# User-friendly function call for removing partitioning
-removeBoundary <- function(sq) {
+# User-friendly transformation function call for removing partitioning
+removePartitioning <- function(sq) {
   trf(sq, 'boundary', partitioning=NA, cl=match.call())
 }
 
@@ -446,6 +456,8 @@ boundary <- function(ang, ...) {
       if (nrow(comm)) {
         ents <- sub('>.*', '', V(ang)$name)
         V(ang)$membership <- comm[match(ents, comm$object), anp]
+        ang <- set_vertex_attr(ang, 
+          'membership', index=is.na(V(ang)$membership), value='ERR')
       } else {
         stop('No memberships pregiven.')
       }
@@ -456,8 +468,8 @@ boundary <- function(ang, ...) {
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Describe current boundary
-getBoundary <- function(sq) {
+# Get current partitioning algorithm or source data
+getPartitioning <- function(sq) {
   tail(sq, 1)[[1]]$partitioning
 }
 
@@ -465,7 +477,7 @@ getBoundary <- function(sq) {
 # SCALE transformations
 ################################################################################
 
-# User-friendly function call
+# User friendly transformation function call
 applyScaling <- function(sq, centers=NA, values=FALSE) {
     trf(sq, 'scale', centers=centers, values=values, cl=match.call())
 }
@@ -475,10 +487,9 @@ scale <- function(ang, ...) {
   ang
 }
 
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Current scaling
+# Current scaling settings
 getScaling <- function(sq) {
   curscaling <- tail(sq, 1)[[1]]$scaling
   ifelse (is.null(curscaling), FALSE, curscaling)
@@ -488,11 +499,12 @@ getScaling <- function(sq) {
 # ALTERNATION transformations
 ################################################################################
 
-# User-friendly transformation function calls
+# User-friendly function call for alternating
 applyAlternation <- function(sq) {
   trf(sq, 'alternation', alternation=TRUE, cl=match.call())
 }
 
+# User-friendly function call removing alternation
 removeAlternation <- function(sq) {
   trf(sq, 'alternation', alternation=FALSE, cl=match.call())
 }
@@ -547,7 +559,8 @@ getAlternation <- function(sq) {
 # Somehow create local symmetries, e.g. replicate attribute counts,
 # neighboring centers, etc.
 
-addSymmetries <- function(sq) {
+# User friendly transformation function call
+applySymmetry <- function(sq) {
   trf(sq, 'symmetry', cl=match.call())
 }
 
@@ -558,10 +571,18 @@ symmetry <- function(ang, ...) {
   tmpang
 }
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# Get current symmerty settings
+getSymmertry <- function(sq) {
+  tail(sq, 1)[[1]]$symmetry
+}
+
 ################################################################################
 # SPACE transformations
 ################################################################################
 
+# User friendly transformation function call
 applySizing <- function(sq, method=NULL) {
   trf(sq, 'space', method=method, cl=match.call())
 }
@@ -587,6 +608,16 @@ space <- function(ang, ...) {
     E(ang)$arrow.size <- E(ang)$width^2
   } else {
     ang <- space_pregiven(ang, method)
+  }
+
+# Limit the range and maximum size
+  maxsize <- max(V(ang)$size)
+  if (maxsize > 35) {
+    for (idx in seq_along(V(ang))) {
+      if (V(ang)[idx]$size > 0) {
+        V(ang)[idx]$size <- round(3 + 30*V(ang)[idx]$size/maxsize)
+      }
+    }
   }
   
   ang
@@ -614,6 +645,14 @@ space_pregiven <- function(ang, method) {
   ang  
 }
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# Get current sizing algorithm or source data
+getSizing <- function(sq) {
+  tail(sq, 1)[[1]]$sizing
+  
+# TODO: Perhaps output some summary statitcs about sizing as well  
+}
 ################################################################################
 # ROUGHNESS transformations
 ################################################################################
@@ -630,7 +669,7 @@ browseSeeds <- function(sq) {
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# User-friendly transformation function call
+# User friendly transformation function call
 applySeed <- function(sq, seed=123) {
   trf(sq, 'roughness', seed=seed, cl=match.call())
 }
@@ -640,6 +679,13 @@ roughness <- function(ang, ...) {
   ang
 }
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# Get current seed
+getSeed <- function(sq) {
+  tail(sq, 1)[[1]]$seed
+}
+
 ################################################################################
 # GRADIENT transformations
 ################################################################################
@@ -647,6 +693,7 @@ roughness <- function(ang, ...) {
 # Fading or transparency based on some measures
 # Remote Centers without attributes as well?
 
+# User friendly transformation function call
 applyGradient <- function(sq, ...) {
   
   ang <- aseq$struct[[length(aseq$struct)]]
@@ -654,16 +701,31 @@ applyGradient <- function(sq, ...) {
   ang
 }
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# Get current gradient settings
+getGradient <- function(sq) {
+  tail(sq, 1)[[1]]$gradient
+}
+
 ################################################################################
 # CONTRAST transformations
 ################################################################################
 
 # Highlight paths (kateto.net good example?) and perhaps also centers/attributes
-contrast <- function(aseq, chkp=NA) {
+
+# User friendly transformation function call
+highlight <-  function(sq, ...) {
+  trf(sq, 'contrast', cl=match.call())
+}
+
+dehighlight <-  function(sq, ...) {
+  trf(sq, 'contrast', cl=match.call())
+}
+
+contrast <- function(ang, ...) {
   
-  ang <- aseq$struct[[length(aseq$struct)]]
-  
-  addAnalysisStep(aseq, match.call(), chkp, ang=ang)
+  ang
 }
 
 ################################################################################
@@ -672,68 +734,123 @@ contrast <- function(aseq, chkp=NA) {
 
 # Can be useful for handling repeating blocks like audit fields
 
+# User friendly transformation function call
 # Group centers and attributes to logical units
-group <- function(aseq, member, group, chkp=NA) {
-  
-  tmpang <- aseq$struct[[length(aseq$struct)]]
+group <- function(sq, member, group, chkp=NA) {
+  trf(sq, 'interlock', cl=match.call())
+}
 
-# Select attributes presented by member argument  
-
-# If members found create group vertex (sphere symbol or {name})
-  
-# Recreate member node edges connected to group vertex
-  
-# Delete member edges
-
-  tmpang
+degroup <-  function(sq, ...) {
+  trf(sq, 'interlock', cl=match.call())
 }
 
 # TODO: Possible to convert communities to groups?
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-#degroup function (or simplify?)
+interlock <- function(ang, ...) {
+  
+  # Select attributes presented by member argument  
+  
+  # If members found create group vertex (sphere symbol or {name})
+  
+  # Recreate member node edges connected to group vertex
+  
+  # Delete member edges
+  
+  ang
+}
 
 ################################################################################
 # ECHO transformations
 ################################################################################
 
-# TODO: Define layouts (colors, lines, shapes) and apply to sequence
+# TODO: Define combinations of colors, lines, shapes, etc. and apply to sequence
 
+browseDesigns <- function(sq, ...) {
+  
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# User friendly transformation function call
 applyDesign <- function(sq, ...) {
   
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# Get current design template
+getDesign <- function(sq, ...) {
+    tail(sq, 1)[[1]]$design
 }
 
 ################################################################################
 # SHAPE transformations
 ################################################################################
 
-applyLayout <- function(sq, ...) {
-
-  }
-
-################################################################################
-# SIMPLICITY transformations
-################################################################################
-
-# Non-essential sans names? etc in the background
-
-applySimplicity <- function(sq, ...) {
+browseLayouts <- function(sq, ...) {
   
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+# User friendly transformation function call
+applyLayout <- function(sq, ...) {
+  
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# Get current layout algorithm
+getLayout <- function(sq, ...) {
+  tail(sq, 1)[[1]]$layout
+}
+
+################################################################################
+# SIMPLICITY transformations
+################################################################################
+
+# User friendly transformation function call
+applySimplicity <- function(sq, ...) {
+  trf(sq, 'simplicity', alternation=FALSE, cl=match.call())  
+}
+
+# Non-essential sans names? etc in the background
+# Transformation function
+simplicity <- function(ang, ...) {
+  
+  # Set big enough criteria to sevent largest value
+  bigenough <- V(ang)[order(V(ang)$size, decreasing=TRUE)[7]]$size
+  for(idx in seq_along(V(ang))) {
+    if (V(ang)[idx]$size < bigenough) {
+      V(ang)[idx]$label <- NA
+    }
+  }
+
+  E(ang)$label <- NA
+  
+  ang
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# Get current simplicity settings
+getSimplicity <- function(sq, ...) {
+  tail(sq, 1)[[1]]$simplicity
+}
+
 ################################################################################
 # VOID transformations
 ################################################################################
 
-# Remove centers
-voidCenters <- function(sq, centers=NULL, ckpt=NA) {
-  trf(sq, 'void', centers=centers, checkpoint=ckpt, cl=match.call())
+# User friendly transformation function call
+void <- function(sq, centers, ckpt=NA) {
+  trf(sq, 'thevoid', centers=centers, checkpoint=ckpt, cl=match.call())
 }
 
-void <- function(ang, ...) {
+# Remove centers
+thevoid <- function(ang, ...) {
   
   # Specific arguments
   aargs <- list(...)
@@ -753,10 +870,17 @@ void <- function(ang, ...) {
 # NOT-SEPARATENESS transformations
 ################################################################################
 
-# TODO: Author, version, etc. personalization
-# TODO: Archive data, code, results time-proof manner
+# User friendly transformation function call
+signoff <- function(sq, ...) {
+  trf(sq, 'notseparateness', cl=match.call())
+}
 
 # Conclude the sequnce
-signoff <- function(sq, ...) {
+notseparateness <- function(ang, ...) {
   
+  cat('Some summary info about the sequence...', '\n\n')
+  
+  cat('Packaging the data and the code...', '\n\n')
+  
+  ang
 }

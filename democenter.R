@@ -4,8 +4,8 @@ source('func.R')
 
 # Sample data loading
 # trdemobs <- read.csv('../data/trdemo.csv', stringsAsFactors=FALSE)
-library(openxlsx)
-trdemobs <- read.xlsx('../data/trdemo.xlsx')
+library(readxl)
+trdemobs <- read_excel('../data/trdemo.xlsx')
 
 # Structure of sample data
 str(trdemobs)
@@ -14,7 +14,7 @@ str(trdemobs)
 table(trdemobs$property)
 
 # Initialize the analysis sequence
-trdemo <- trsq('Demonstration sequence', 'trdemobs')
+trdemo <- newsq('Demonstration sequence', 'trdemobs')
 trdemo
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -24,11 +24,11 @@ head(browseData(trdemo), 3)
 tail(browseData(trdemo), 3)
 
 # Create the initial structure
-trdemo <- addCenters(trdemo, 'C01', depth=2)
+trdemo <- grow(trdemo, 'C01', depth=2)
 trdemo
 
 # Add attributes and values to certain entities
-trdemo <- addCenters(trdemo, c('C01','C02'), depth=0, addelem=TRUE, addval=TRUE)
+trdemo <- grow(trdemo, c('C01','C02'), depth=0, attrs=TRUE, vals=TRUE)
 trdemo
 
 # Existing centers and their connections
@@ -38,17 +38,17 @@ getRelations(trdemo)
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Apply community detection algorithm
-browseBoundaries(trdemo)
-trdemo <- applyBoundary(trdemo, partitioning='cluster_walktrap')
+browsePartitionings(trdemo)
+trdemo <- applyPartitioning(trdemo, partitioning='cluster_walktrap')
 trdemo
 
 # Visualize pregiven communities 
 browseEntities(trdemo)[ ,c('object', 'member')]
-trdemo <- applyBoundary(trdemo, partitioning='member')
+trdemo <- applyPartitioning(trdemo, partitioning='member')
 trdemo
 
 # Current clustering
-getBoundary(trdemo)
+getPartitioning(trdemo)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -59,13 +59,13 @@ getScaling(trdemo)
 browseData(trdemo)[sample(1:nrow(browseData(trdemo)), 6), c('object','size')]
 
 # Scaling by pregiven sizes
-trdemo <- applyScale(trdemo, values=3)
-trdemo
+# trdemo <- applyScale(trdemo, values=3)
+# trdemo
 
 # Scaling by pregiven sizes
 
 # Global scaling settings after transformations
-getScaling(trdemo)
+# getScaling(trdemo)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -81,13 +81,13 @@ trdemo
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Symmetries
-trdemo <- addSymmetries(trdemo)
-trdemo
+# trdemo <- addSymmetries(trdemo)
+# trdemo
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Space
-trdemo <- applySizing(trdemo)
+# trdemo <- applySizing(trdemo)
 # Power centrality calculation (TODO: integrate with sp)
 # power_centrality(trdemo$struct[[length(trdemo$struct)]])
 
@@ -126,13 +126,15 @@ trdemo
 
 # Simplicity: Simplify the analysis
 
+trdemo <- applySimplicity(trdemo)
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Void: Remove clutter
 
-trdemo <- voidCenter(trdemo, c('C02','C07'))
+trdemo <- void(trdemo, c('C02','C07'))
 trdemo
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Not-separateness: sign, package and freeze the analysis?
+# Not-separateness: sign, package and freeze the analysis
+signoff(trdemo)

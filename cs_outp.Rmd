@@ -34,7 +34,7 @@ obsw[grepl('ERR_', obsw$mbrp_module), 'mbrp_module'] <- '?'
 # Display possibly not used portion in local/core membership
 
 
-par(mfrow=c(4,2), mar=c(3,2,6,1), oma=c(1,1,2,0))
+par(mfrow=c(4,2), mar=c(3,2,4,1), oma=c(1,1,2,0))
 with(obsw, {
   barplot(table(mbrp_module), space=0, main='Membership: module')
   barplot(table(mbrp_localcore), main='Membership: local/core')
