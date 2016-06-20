@@ -1,51 +1,64 @@
 ---
-title: "cs"
-output: word_document
+title: "Case study"
+output:
+  html_document:
+    highlight: pygments
+  pdf_document: default
 ---
+# Overview
 ```{r}
-# Load observations
-library(readxl)
+# Load data observations
+suppressWarnings(library(readxl))
 t24obs <- read_excel('../data/t24.xlsx')
 
 # Observations data frame structure
-str(t24obs, width=70, strict.width='cut')
+str(t24obs, strict.width='cut', width=70)
+
 
 #Summary of object properties observed
 table(t24obs$property)
 
 #Sample observations of each property
+set.seed(123)
 sobs <- t(sapply(unique(t24obs$property), function(x) {
   sobs <- t24obs[t24obs$property==x,]; sobs[sample(1:nrow(sobs), 1), ] }))
-
 print(as.data.frame(sobs), row.names=FALSE)
-```
 
-# Exploratory analysis
-```{r}
-# Common functions
+# Convert to wide format
 source('func.R')
-
-t24 <- trsq('vizgraph', 't24obs')
+t24 <- newsq('vizgraph', 't24obs')
 obsw <- browseData(t24)
+str(obsw, give.attr=FALSE, strict.width='cut', width=70)
 
-# Fix membership plots: combine module detection errors
+# Prepare data for modularization plot
 obsw[grepl('ERR_', obsw$mbrp_module), 'mbrp_module'] <- '?'
  
-# Display possibly not used portion in local/core membership
+md <- obsw[!is.na(obsw$mbrp_module), c('object','mbrp_module','mbrp_localcore','wt_numrec')]
+mcore <- data.frame(table(md[md$mbrp_localcore=='core','mbrp_module']))
+mlocal <- data.frame(table(md[md$mbrp_localcore=='local','mbrp_module']))
+maggr <- aggregate(wt_numrec~mbrp_module, md, sum)
 
+maggr$width = round(log10(1+maggr$wt_numrec))
+m <- merge(mcore, mlocal, by="Var1", all.x=TRUE)
+m <- merge(m, maggr, by.x="Var1", by.y="mbrp_module")
+m <- t(m)
+m[is.na(m)] <- 0
 
-par(mfrow=c(4,2), mar=c(3,2,4,1), oma=c(1,1,2,0))
+# TODO: Record count not taking into account history very wrong?
+
+par(mar=c(3,2,4,1), oma=c(1,1,2,0))
+layout(matrix(c(1,2,4,6,1,3,5,7), nrow=4))
 with(obsw, {
-  barplot(table(mbrp_module), space=0, main='Membership: module')
-  barplot(table(mbrp_localcore), main='Membership: local/core')
-  hist(wt_numattr, breaks=20, main="Number of attributes")
-  hist(obsw[wt_numrec > 1000, 'wt_numrec'], breaks=20, main="Number of records")
-  hist(wt_volattr, main="Attibute size")
-  hist(wt_fillattr, main="Attribute completeness")
-  hist(wt_volrec, main="Record size")
-  hist(wt_fillrec, main='Record completeness')
+  pmain = "Modularization [height=number of tables; width=log(1+sum(wt_numrec)); dark=core; light=local]"
+  barplot(rbind(as.numeric(m[2, ]), as.numeric(m[3, ])), names=m[1, ], width=as.numeric(m[5, ]), space=0, main=pmain, cex.names=0.9)
+  hist(log10(1+wt_numrec), breaks=20, main='Number of records [log(1+wt_numrec)]')
+  hist(wt_numattr, breaks=20, main="Number of attributes [wt_numattr]")
+  hist(log10(1+wt_volrec), breaks=20, main="Record size [log(1+wt_volrec) in kB]")
+  hist(wt_fillrec, breaks=20, main='Record completeness [wt_fillrec, %]')
+  hist(log10(1+wt_volattr), breaks=20, main="Attibute size [log(1+wt_volattr) in kB]")
+  hist(wt_fillattr, breaks=20, main="Attribute completeness [wt_fillattr, %]")
 })
 mtext("Summary of Data Observations", outer=TRUE, cex=1.3)
 
 ```
-
+# Scheduling

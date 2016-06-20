@@ -1,6 +1,6 @@
 ---
 title: "anobj"
-output: html_document
+output: word_document
 ---
 Progression of the analysis has a certain structure. This stucture might contain trees, circles, loops, etc. Herein we limit the structure to a simple sequence
 
@@ -19,7 +19,7 @@ str(anobs)
 table(anobs$property)
 
 # Initialize the analysis sequence
-anobj <- trsq('Analysis object', 'anobs')
+anobj <- newsq('Analysis object', 'anobs')
 ```
 
 ## Analysis object context
@@ -31,11 +31,11 @@ voidCenters: if ckpt specified remove all not equal to ckpt or null ckpt
 
 ```{r}
 # Create centers
-anobj <- addCenters(anobj, 'SEQUENCE', depth=2, ckpt='context')
+anobj <- grow(anobj, 'SEQUENCE', depth=2, ckpt='context')
 
 # Apply appropriate seed and partition
 anobj <- applySeed(sq=anobj, seed=163)
-anobj <- applyBoundary(anobj, 'mbrp')
+anobj <- applyPartitioning(anobj, 'mbrp')
 anobj
 ```
 
@@ -43,7 +43,7 @@ anobj
 
 ```{r}
 
-anobj <- addCenters(anobj, 'GRAPH', attrs=T, vals=T, ckpt='details')
+anobj <- grow(anobj, 'GRAPH', attrs=T, vals=T, ckpt='details')
 anobj <- applySizing(anobj)
 anobj <- applySeed(sq=anobj, seed=747)
 anobj

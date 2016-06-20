@@ -116,6 +116,8 @@ GET.DATA.SUMMARY:
         NEXT fld_idx
     NEXT rec_idx
 
+* TOD: volrec and voldattr seem to fit into one vol column
+
 * Field averages
     volrec = 0 ; fillrec = 0
     FOR fld_idx = 1 TO fieldCount

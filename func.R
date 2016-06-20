@@ -1,5 +1,5 @@
 
-library(igraph)
+library(igraph,  quietly=TRUE)
 
 ################################################################################
 # Analysis object and related methods
