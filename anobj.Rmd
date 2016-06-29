@@ -1,6 +1,6 @@
 ---
 title: "anobj"
-output: word_document
+output: html_document
 ---
 Progression of the analysis has a certain structure. This stucture might contain trees, circles, loops, etc. Herein we limit the structure to a simple sequence
 
@@ -65,6 +65,7 @@ To illustrate the timeline
 ## Analysis object overview
 
 ```{r}
-
+anobj <- applyTheme(anobj, 'minimalist')
+anobj
 ```
 

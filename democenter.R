@@ -52,20 +52,16 @@ getPartitioning(trdemo)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Global scaling settings
+# Growing the structure with no scaling
 getScaling(trdemo)
+grow(trdemo, "C10", attrs=TRUE)
 
-# Sample of sizing information
-browseData(trdemo)[sample(1:nrow(browseData(trdemo)), 6), c('object','size')]
+# Growing the network with scaling by pregiven sizes
+attrs <- grepl('C10>', browseData(trdemo)$object)
+browseData(trdemo)[attrs, c('object','size','linktype','objattr')]
 
-# Scaling by pregiven sizes
-# trdemo <- applyScale(trdemo, values=3)
-# trdemo
-
-# Scaling by pregiven sizes
-
-# Global scaling settings after transformations
-# getScaling(trdemo)
+trdemo <- applyScaling(trdemo, scaling=3)
+grow(trdemo, "C10", attrs=TRUE)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -81,52 +77,70 @@ trdemo
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Symmetries
-# trdemo <- addSymmetries(trdemo)
-# trdemo
+applySymmetry(trdemo)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Space
 # trdemo <- applySizing(trdemo)
-# Power centrality calculation (TODO: integrate with sp)
+trdemo
+
+# TODO: integrate with transformation
 # power_centrality(trdemo$struct[[length(trdemo$struct)]])
+trdemo
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Roughness
 browseSeeds(trdemo)
+
 trdemo <- applySeed(trdemo, seed=543)
+trdemo
+
+getSeed(trdemo)
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# Gradient
+trdemo <- applyGradient(trdemo, 'C01')
 trdemo
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Gradient
+# Highlight C02
+trdemo <- highlight(trdemo, 'C02')
+trdemo
 
+trdemo <- dehighlight(trdemo, 'C02')
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Contrast
+# Group items
+trdemo <- group(trdemo, 'C03&07', c('C03','C07'))
+trdemo
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-# Interlock
+# Disband the group
+trdemo <- degroup(trdemo, 'C03&07')
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Echo
+trdemo <- removePartitioning(trdemo)
+
+browseThemes(trdemo)
+trdemo <- applyTheme(trdemo, 'minimalist')
+trdemo
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Roughness
+# Shape:
+browseLayouts(trdemo)
+trdemo <- applyLayout(trdemo, 'layout_with_kk')
+trdemo
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Shape: 
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-# Simplicity: Simplify the analysis
-
+# Simplicity: Simplify the display of the structure
 trdemo <- applySimplicity(trdemo)
+trdemo
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Void: Remove clutter

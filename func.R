@@ -1,5 +1,5 @@
 
-library(igraph,  quietly=TRUE)
+library(igraph, quietly=TRUE)
 
 ################################################################################
 # Analysis object and related methods
@@ -10,14 +10,19 @@ newsq <- function(name, data, ...) {
 
   # Empty graph with default settings  
   ang <- set_trsq_attr(graph.empty(), match.call(),
-                       
-    # General (sequence or multi-step) metadata
+
+    # Generic (sequence or multi-step) metadata
     name=name, data=data, checkpoint=NA, output='plot',
-    
-    # Global properties
-    partitioning=NA, scaling=NA, alternation=FALSE, symmetry=NA, sizing=NA,
-    seed=1, gradient=FALSE, design=NA, layout=NA, simplicity=FALSE, ...)
-  
+
+    # Global properties with no default value
+    partitioning=NA, scaling=NA, symmetry=NA, sizing=NA, layout=NA, 
+
+    # Global properties with default value
+    seed=1, theme='expressive', 
+
+    # Global boolean properties
+    gradient=FALSE, alternation=FALSE, simplicity=FALSE, ...)
+
   # Return a list comprised of an empty graph
   structure(list(ang), class='trsq')
 }
@@ -57,15 +62,17 @@ set_trsq_attr <- function(ang, cl, ...) {
   
   # Mandatory attributes
   ang$dtstamp <- Sys.time()
-  if (class(cl) == 'call') ang$transformation <- gsub(' = ', '=', deparse(cl))
+  
+#  if (class(cl) == 'call') {
+    ang$transformation <- gsub(' = ', '=', deparse(cl))[1]
+#  }
   
   # Arbitrary attributes
   aargs <- list(...)
-  knownargs <- c('name','data',
-    'checkpoint','seed','partitioning','alternation','output')
   for (idx in seq_along(aargs)) {
     curname <- names(aargs[idx])
-    if (is.element(curname, knownargs)) {
+    isKnownName <- is.element(curname, list.graph.attributes(ang))
+    if (substr(ang$transformation, 1, 5) == 'newsq' | isKnownName) {
       ang <- set_graph_attr(ang, curname, aargs[[idx]])
     }
   }
@@ -119,67 +126,122 @@ summary.trsq <- function(sq, all=FALSE) {
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+# TODO: Limit sequence output to 80 columns (long trans truncated with ...)
+# TODO: Limit axis labels to one line
+
 # Sequence overview printing
-print.trsq <- function(sq, seed=NA) {
+print.trsq <- function(sq, ...) {
 
   ang <- tail(sq, 1)[[1]]
 
-  # TODO: Limit sequence output to 80 columns (long trans truncated with ...)
-  
-  # Set random number generator
-  set.seed(ifelse(is.na(seed), ang$seed, seed))
-
-  # TODO: Limit axis labels to one line
-  
   # Textual output
-  curxlab <- ang$transformation
-  if (!grepl('=try', curxlab)) {
-    cat(ang$name, '\n\n')
-    # print(cbind(id=format(sqtail$id, "%R"), sqtail[ ,2:3]), row.names=FALSE)
-    print(tail(summary(sq), 3))
-    par(mfrow = c(1,1), cex.lab=0.8)
-  } else {
-    if (grepl('=tryanp', curxlab)) curxlab <- paste('method:', ang$partitioning)
-    if (grepl('=tryseed', curxlab)) curxlab <- paste('seed:', ang$seed)
-    print(curxlab)
-  }
-  
-  # Plot on requested device
+  curxlab <- ang$transformation[1]
+  cat(ang$name, '\n\n')
+  # print(cbind(id=format(sqtail$id, "%R"), sqtail[ ,2:3]), row.names=FALSE)
+  print(tail(summary(sq), 3))
+  par(mfrow = c(1,1), cex.lab=0.8)
+
+  # Graphical output
   if (vcount(ang) > 0) {
-    
-    # Graphics parameters
-     # layout <- layout.reingold.tilford(ang, circular=T)
-    #layout <- layout.fruchterman.reingold(ang, niter=10000)
-    # layout <- layout_as_star(ang)
-    # layout <- layout_on_grid(ang)
-    layout <- layout_nicely(ang) 
-    plopt <- list(xlab=curxlab, edge.arrow.size=0.2, layout=layout,
-      vertex.frame.color=NA, vertex.label.family='sans', edge.label.cex=0.8)
-    
-    if (ang$output=='plot') {
-      plot.trsq(sq, plopt)      
-    } else {
-      tkplot(ang, unlist(plopt))
-    }
+    plot.trsq(sq, title=curxlab)
   }
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Sequence last graph plotting
-plot.trsq <- function(sq, plopt) {
-  
-  # TODO: Perhaps by using qgraph instead of igraph)
+# TODO: Perhaps by using qgraph instead of igraph)
+
+# Output last graph of the sequence
+plot.trsq <- function(sq, title='plot1') {
+
   ang <- tail(sq, 1)[[1]]
+  plopt <- list(xlab=title)
+  
+  # Set random number generator
+  set.seed(ang$seed)
+  
+  # Apply layout
+  if (is.na(ang$layout)) {
+    layout <- layout_nicely(remove.graph.attribute(ang, 'layout'))
+  } else {
+    layout <- do.call(ang$layout, list(ang))
+  }
+  
+  # Simplified/full presentation
+  # Non-essential sans names? etc in the background
+  if (ang$simplicity) {
+    plopt <- c(plopt, edge.arrow.mode=0, vertex.label.cex=0.8)
+    
+    if (length(V(ang)) > 7) {
+      # Set big enough criteria to sevent largest value
+      bigenough <- V(ang)[order(V(ang)$size, decreasing=TRUE)[7]]$size
+      for(idx in seq_along(V(ang))) {
+        if (V(ang)[idx]$size < bigenough) {
+          V(ang)[idx]$label <- NA
+        }
+      }
+      E(ang)$label <- NA
+    }
+  }
+  
+  # Apply theme
+  if (ang$theme == 'expressive') {
+    if (is.na(ang$partitioning)) {
+      V(ang)$color <- 'orange1'
+    } else if (ang$simplicity) {
+      mbrpn <- as.numeric(as.factor(membership(V(ang))))
+      #palette <- colorRampPalette(c('yellow','brown'), alpha=0.8)
+      #colrs <- palette(max(mbrpn))[mbrpn]
+      colrs <- rainbow(max(mbrpn), alpha=0.8)[mbrpn]
+      plopt <- c(plopt, vertex.color=list(colrs))
+    }
+  }
+  if (ang$theme == 'minimalist') {
+    if (is.na(ang$partitioning)) {
+      V(ang)$color <- 'lightgrey'
+    } else if (ang$simplicity) {
+      mbrpn <- as.numeric(as.factor(membership(V(ang))))
+      colrs <- gray.colors(max(mbrpn))[mbrpn]
+      plopt <- c(plopt, vertex.color=list(colrs))
+    }
+  }
+  
+  plopt <- c(plopt, layout=list(layout), 
+    vertex.frame.color=NA, vertex.label.family='sans', edge.arrow.size=0.2,
+    edge.label.cex=0.8, edge.curved=list(0.3*which_mutual(ang)))
+  
+  # TODO: cluster coloring
+  # If Simplicity, color notes to represent communities
+  # do.call('plot', c(list(anp, ang), plopt, list(col=c("green","blue") )))
+  
+  # Apply partitioning
   anp <- ang$partitioning
   
   # Output a graph or a graph with community
-  if (is.na(anp)) {
-    do.call('plot', c(list(ang), plopt))
+  if (is.na(anp) | ang$simplicity) {
+      do.call(ang$output, c(list(ang), plopt))
   } else {
-    mship <- V(ang)$membership
-    anp <- make_clusters(ang, as.numeric(factor(mship)))
+    mbrp <- V(ang)$membership
+    anp <- make_clusters(ang, as.numeric(factor(mbrp)))
+    
+    # TODO: communities in tkplot using color
     do.call('plot', c(list(anp, ang), plopt))
+  }
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# Output multiple plots
+multiplot <- function(x, ...) UseMethod('multiplot')
+
+multiplot.trsq <- function(sq, fun, items) {
+  
+  nrows <- round(length(items)/3)
+  ncols <- ifelse(length(items) < 3, length(items), 3)
+  par(mfrow=c(nrows,ncols), cex.lab=1, mar=c(4,1,1,1))
+  
+  for (item in items) {
+    plot(do.call(fun, list(sq, item)), item)
   }
 }
 
@@ -247,7 +309,6 @@ browseRelations <- browseSource('relationship')
 
 # User friendly transformation function call
 grow <- function(sq, cntr, depth=1, attrs=FALSE, vals=FALSE, ckpt=NA) {
-  
   trf(sq, 'center', cl=match.call(), centers=cntr,
     depth=depth, attrs=attrs, vals=vals, checkpoint=ckpt)
 }
@@ -409,15 +470,18 @@ getRelations <- function(sq) {
 ################################################################################
 
 # Explore clustering algorithms
-browsePartitionings <- function(sq) {
+browsePartitionings <- function(sq, plot=TRUE, ...) {
   
   # Available algorithms
   methods <- c('cluster_edge_betweenness','cluster_label_prop',
-    'cluster_infomap','cluster_optimal','cluster_spinglass','cluster_walktrap')  
+     'cluster_infomap','cluster_optimal','cluster_spinglass','cluster_walktrap')  
   
-  # Apply the algorithms
-  par(mfrow=c(2,3), cex.lab=1, mar=c(5, 0, 3, 0))
-  lapply(methods, function(tryanp) applyPartitioning(sq, tryanp))
+  # Plot or list algorithms
+  if (plot) {
+    multiplot(sq, 'applyPartitioning', methods)
+  } else {
+    methods
+  }
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -478,12 +542,11 @@ getPartitioning <- function(sq) {
 ################################################################################
 
 # User friendly transformation function call
-applyScaling <- function(sq, centers=NA, values=FALSE) {
-    trf(sq, 'scale', centers=centers, values=values, cl=match.call())
+applyScaling <- function(sq, scaling) {
+    trf(sq, 'scale', scaling=scaling, cl=match.call())
 }
 
 scale <- function(ang, ...) {
-  
   ang
 }
 
@@ -491,8 +554,7 @@ scale <- function(ang, ...) {
 
 # Current scaling settings
 getScaling <- function(sq) {
-  curscaling <- tail(sq, 1)[[1]]$scaling
-  ifelse (is.null(curscaling), FALSE, curscaling)
+  tail(sq, 1)[[1]]$scaling
 }
 
 ################################################################################
@@ -574,7 +636,7 @@ symmetry <- function(ang, ...) {
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Get current symmerty settings
-getSymmertry <- function(sq) {
+getSymmetry <- function(sq) {
   tail(sq, 1)[[1]]$symmetry
 }
 
@@ -657,26 +719,31 @@ getSizing <- function(sq) {
 # ROUGHNESS transformations
 ################################################################################
 
-# Explore clustering algorithms
+# Explore randomizations
 browseSeeds <- function(sq) {
-
-  npanels <- 6
-  seeds <- sample(1:1000, npanels)
-  
-  par(mfrow=c(2,3), cex.lab=1, mar=c(5, 0, 3, 0))
-  lapply(seeds, function(tryseed) applySeed(sq, tryseed))
+  seeds <- sample(1:1000, size=9)
+  multiplot(sq, 'applySeed', seeds)
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# User friendly transformation function call
+# User-friendly transformation function call
 applySeed <- function(sq, seed=123) {
   trf(sq, 'roughness', seed=seed, cl=match.call())
 }
 
 # Transformation function
 roughness <- function(ang, ...) {
-  ang
+  seed <- list(...)$seed
+  if (is.numeric(seed)) {
+    if (seed == as.integer(seed)) {
+      ang
+    } else {
+      stop('Seed must be integer.')
+    }
+  } else {
+    stop('Seed must be numeric.')
+  }
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -694,10 +761,14 @@ getSeed <- function(sq) {
 # Remote Centers without attributes as well?
 
 # User friendly transformation function call
-applyGradient <- function(sq, ...) {
-  
-  ang <- aseq$struct[[length(aseq$struct)]]
+applyGradient <- function(sq, center) {
+  trf(sq, 'gradient', center=center, cl=match.call())
+}
 
+# Transformation function
+gradient <- function(ang, ...) {
+
+# TODO: Calculate gradient of every entity and adjust number of attributes accordingly
   ang
 }
 
@@ -736,11 +807,11 @@ contrast <- function(ang, ...) {
 
 # User friendly transformation function call
 # Group centers and attributes to logical units
-group <- function(sq, member, group, chkp=NA) {
+group <- function(sq, group, members, ...) {
   trf(sq, 'interlock', cl=match.call())
 }
 
-degroup <-  function(sq, ...) {
+degroup <-  function(sq, group, ...) {
   trf(sq, 'interlock', cl=match.call())
 }
 
@@ -765,39 +836,82 @@ interlock <- function(ang, ...) {
 # ECHO transformations
 ################################################################################
 
-# TODO: Define combinations of colors, lines, shapes, etc. and apply to sequence
-
-browseDesigns <- function(sq, ...) {
+# Explore available themes
+browseThemes <- function(sq, plot=TRUE) {
   
+  themes <- c('expressive','minimalist')
+  
+  # Plot or list themes
+  if (plot) {
+    multiplot(sq, 'applyTheme', themes)
+  } else {
+    themes
+  }
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # User friendly transformation function call
-applyDesign <- function(sq, ...) {
-  
+applyTheme <- function(sq, theme, ...) {
+  trf(sq, 'echo', theme=theme, cl=match.call(), ...) 
+}
+
+echo <- function(ang, ...) {
+  aargs <- list(...)
+  if(is.element(aargs$theme, browseThemes(sq, plot=FALSE))) {
+    ang 
+  } else {
+    stop(paste('Unknown theme:', aargs$theme))
+  }
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Get current design template
-getDesign <- function(sq, ...) {
-    tail(sq, 1)[[1]]$design
+getTheme <- function(sq, ...) {
+  tail(sq, 1)[[1]]$theme
 }
 
 ################################################################################
 # SHAPE transformations
 ################################################################################
 
-browseLayouts <- function(sq, ...) {
+# TODO: layout parameters: 
+# -layout.reingold.tilford(ang, circular=T), 
+# -layout <- layout.fruchterman.reingold(ang, niter=10000)
+
+# Explore available layouts
+browseLayouts <- function(sq, plot=TRUE, ...) {
+
+  # TODO: Replace with a list limited to useful in this context layouts
+  layouts <- grep("^layout_", ls("package:igraph"), value=TRUE)[-1]
   
+  # TODO: bipartite if alternation=TRUE
+  layouts <- layouts[!grepl("bipartite|nicely|sugiyama|tree", layouts)]
+  
+  # Plot or list layouts
+  if (plot) {
+    multiplot(sq, 'applyLayout', layouts)
+  } else {
+    layouts 
+  }
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# User friendly transformation function call
-applyLayout <- function(sq, ...) {
-  
+# User-friendly function call for setting the layout
+applyLayout <- function(sq, layout, ...) {
+  trf(sq, 'shape', layout=layout, cl=match.call(), ...)  
+}
+
+# Transformation function
+shape <- function(ang, ...) {
+  aargs <- list(...)
+  if(is.element(aargs$layout, browseLayouts(sq, plot=FALSE))) {
+    ang 
+  } else {
+    stop(paste('Unknown layout:', aargs$layout))
+  }
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -811,29 +925,22 @@ getLayout <- function(sq, ...) {
 # SIMPLICITY transformations
 ################################################################################
 
-# User friendly transformation function call
+# User-friendly function call for setting simplified presentation mode
 applySimplicity <- function(sq, ...) {
-  trf(sq, 'simplicity', alternation=FALSE, cl=match.call())  
+  trf(sq, 'simplicity', simplicity=TRUE, cl=match.call(), ...)  
 }
 
-# Non-essential sans names? etc in the background
+# User-friendly function call for setting full presentation mode
+removeSimplicity <- function(sq, ...) {
+  trf(sq, 'simplicity', simplicity=FALSE, cl=match.call(), ...)
+}
+
 # Transformation function
 simplicity <- function(ang, ...) {
-  
-  # Set big enough criteria to sevent largest value
-  bigenough <- V(ang)[order(V(ang)$size, decreasing=TRUE)[7]]$size
-  for(idx in seq_along(V(ang))) {
-    if (V(ang)[idx]$size < bigenough) {
-      V(ang)[idx]$label <- NA
-    }
-  }
 
-  E(ang)$label <- NA
-  
+  # TODO: Restore labels etc in removing simplicity  
   ang
 }
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Get current simplicity settings
 getSimplicity <- function(sq, ...) {
