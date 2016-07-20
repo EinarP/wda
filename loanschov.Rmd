@@ -1,0 +1,52 @@
+---
+title: "Generation"
+output:
+  word_document: default
+---
+This is analysis of LD module structure for understanding its loan schedule handling mechanisms
+
+```{r message=FALSE}
+#Common functions
+source('func.R')
+
+#Load observations
+t24obs <- read.csv('../data/t24.csv', stringsAsFactors=FALSE)
+
+#Start from the root
+ldsch <- trsq('LD scheduling overview', 't24obs')
+ldsch <- addCenters(ldsch, 'LD.LOANS.AND.DEPOSITS')
+ldsch
+```
+
+There are too many edges shown and none of them seems useful. Remove these and replace with connections based on record scan
+
+```{r}
+#Remove clutter
+getCenter(ldsch)
+
+voidList <- grep('LD', getCenter(ldsch), invert=TRUE, value=TRUE)
+ldsch <- voidCenter(ldsch, voidList)
+ldsch
+
+#addCenter(ldsch, 'LD.LOANS.AND.DEPOSITS', scan='LD')
+
+```
+
+We need to scale down to attribute level to understand the structure better. No reason to scale up
+
+```{r}
+#scaleDown(ldsch)
+```
+
+What can we conclude based on analysis
+
+PS. Demonstration that brute force is not helpful with igraph
+```{r}
+el <- obs[obs$property=='linkdef', ]
+
+from <- sub('>.*$', '', el$object)
+to <- gsub("^[^>]+>\\s*", "", el$object)
+
+plot(graph.data.frame(data.frame(from, to, el$value)))
+```
+
