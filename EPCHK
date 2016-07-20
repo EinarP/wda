@@ -1,39 +1,54 @@
 *------------------------------------------------------------------------------
-* <Rating>90</Rating>
+* <Rating>760</Rating>
 *------------------------------------------------------------------------------
     SUBROUTINE EPCHK
+*------------------------------------------------------------------------------
+* Output file in &HOLD& where to add the results
+    outf = 't24mb.csv'
+* Local development prefixes array
+    ldev = ''
+* Record to be scanned [FILE:@ID]
+*    scan = ''
+    scan = 'LD.LOANS.AND.DEPOSITS':@FM:'LD1000598675'
+* Checkpoint to be recorded
+*    ckpt = ''
+    ckpt = 'vdate'
+* Sample size
+    maxSampleSize = 30
 *------------------------------------------------------------------------------
     $INSERT I_COMMON
     $INSERT I_EQUATE
     $INSERT I_F.STANDARD.SELECTION
     $INSERT I_F.COMPANY
-*------------------------------------------------------------------------------
-    outf = 't24mb.csv'        ;* Output file name
-    ldev = ''       ;* Local development prefixes array
-    scan = ''       ;* string to be scanned
-    ckpt = ''       ;* checkpoint to be recorded
-*------------------------------------------------------------------------------
 
     startTime = TIME()
     GOSUB INITIALISE
 
     selc = 'SELECT F.STANDARD.SELECTION WITH @ID UNLIKE NOFILE...'
-*    selc = 'SELECT F.STANDARD.SELECTION WITH @ID EQ "BASIC.INTEREST"'
     CALL EB.READLIST(selc, ssList, '', ssCount, '')
-
     FOR app_idx = 1 TO ssCount
 
+        curApp = ssList<app_idx>
         GOSUB OPEN.APP.FILE
-        IF NOT(ERR) THEN
-		
+        IF ERR THEN CONTINUE
+
+* Process application descriptions
+        IF NOT(scan) THEN
             GOSUB GET.MEMBERSHIP
             GOSUB GET.APP.SUMMARY
-            IF curm[1,4] NE 'ERR_' THEN
+        END
+
+* Process application records
+        GOSUB SELECT.APP.RECS
+        IF NOT(ERR) THEN
+            IF scan THEN
+                GOSUB SCAN.RECS
+            END ELSE
                 GOSUB GET.DATA.SUMMARY
             END
-
-            CLOSE F.APP
         END
+
+        CLOSE F.APP
     NEXT app_idx
 
     GOSUB WRITE.OUTP
@@ -41,50 +56,42 @@
 
     RETURN
 *-------------------------------------------------------------------------------
+INITIALISE:
+
+    FN.SS = 'F.STANDARD.SELECTION'
+    CALL OPF(FN.SS, F.SS)
+
+    selc = 'SELECT F.FILE.CONTROL'
+    CALL EB.READLIST(selc, fileControlList, '', fileControlCount, '')
+
+    sels = "@ID:'|':PRODUCT"
+    selc = 'SELECT F.PGM.FILE SAVING EVAL "':sels:'"'
+    CALL EB.READLIST(selc, pgmFileList, '', pgmFileCount, '')
+    pgmFileList = CHANGE(pgmFileList, '|', @VM)
+
+    outp = ''
+
+    RETURN
+*-------------------------------------------------------------------------------
 OPEN.APP.FILE:
 
     ERR = ''
 
-    FN.APP = 'F.':ssList<app_idx>
+* Attempt to open file
+    FN.APP = 'F.':curApp
     OPEN '',FN.APP TO F.APP ELSE
-        FN.APP = 'F':R.COMPANY(EB.COM.MNEMONIC):'.':ssList<app_idx>
+        FN.APP = 'F':R.COMPANY(EB.COM.MNEMONIC):'.':curApp
         OPEN '',FN.APP TO F.APP ELSE
-            ERR = "Failed to open: ":FN.APP
-            PRINT ERR
+            ERR = 'ERR_FILE_OPEN_FAILURE'
+            GOTO ERR.HANDLER
         END
     END
 
-    RETURN
-*-------------------------------------------------------------------------------
-GET.MEMBERSHIP:
-
-    ERR = ''
-
-* Modularization of the system
-    FIND ssList<app_idx> IN pgmFileList SETTING fpos,vpos THEN
-        curm = pgmFileList<fpos,2>
-        IF NOT(curm) THEN
-            curm = 'ERR_NO_PRODUCT_IN_PGM.FILE'
-        END
-    END ELSE
-        curm = 'ERR_NOT_IN_PGM.FILE'
-    END
-
-    IF curm[1,4] EQ 'ERR_' THEN
-        PRINT curm:": ":ssList<app_idx>
-    END
-
-    outp<-1> = ssList<app_idx>:',mbrp,':curm
-
-* TODO: Division to core and local development
-
-    RETURN
-*-------------------------------------------------------------------------------
-GET.APP.SUMMARY:
+* Field names from SS
+    fieldList = ''
+    linkList = ''
 
     CALL F.READ(FN.SS, ssList<app_idx>, R.SS, F.SS, '')
-
-    fieldList = ''
 
     prevFieldNo = -1
     sysFieldCount = DCOUNT(R.SS<SSL.SYS.FIELD.NAME>, @VM)
@@ -105,8 +112,8 @@ GET.APP.SUMMARY:
 
             relFile = R.SS<SSL.SYS.REL.FILE,ss_idx>
             IF relFile THEN
-                curLink = ssList<app_idx>:'>':curFieldName:'|':relFile
-                outp<-1> = curLink:',type,defined'
+                curLink = curApp:'>':curFieldName:'|':relFile
+                linkList<-1> = curLink:',type,defined'
             END ELSE
 * TODO: If not data wt needed outl := ',attribute,':R.SS<SSL.SYS.FIELD.NAME,j>
             END
@@ -114,16 +121,89 @@ GET.APP.SUMMARY:
     NEXT ss_idx
 
     fieldCount = DCOUNT(fieldList, @FM)
-    outp<-1> = ssList<app_idx>:',wt_numattr,':fieldCount
+
+    RETURN
+*-------------------------------------------------------------------------------
+GET.MEMBERSHIP:
+
+* Modularization of the system
+    FIND curApp IN pgmFileList SETTING fpos,vpos THEN
+        curm = pgmFileList<fpos,2>
+        IF NOT(curm) THEN
+            curm = 'ERR_NO_PRODUCT_IN_PGM.FILE'
+        END
+        outp<-1> = curApp:',mbrp,':curm
+    END ELSE
+        ERR = 'ERR_NOT_IN_PGM.FILE'
+        GOTO ERR.HANDLER
+    END
+
+* TODO: Division to core and local development
+
+    RETURN
+*-------------------------------------------------------------------------------
+GET.APP.SUMMARY:
+
+    IF linkList THEN outp<-1> = linkList
+    outp<-1> = curApp:',wt_numattr,':fieldCount
+
+    RETURN
+*-------------------------------------------------------------------------------
+SELECT.APP.RECS:
+
+    ERR = ''
+
+    FIND curApp IN fileControlList SETTING fpos THEN
+        CALL EB.READLIST('SELECT ':FN.APP, recList, '', recCount, '')
+    END ELSE
+        ERR = 'ERR_NOT_IN_FILE.CONTROL'
+        GOTO ERR.HANDLER
+    END
+
+* Sample without replacement if more than maxSampleSize records
+    IF scan OR recCount LE maxSampleSize THEN
+        sampleCount = recCount
+        sampleList = recList
+    END ELSE
+        sampleCount = maxSampleSize
+
+        rkList = ''
+        FOR rec_idx = 1 TO sampleCount
+            LOOP rid = RND(recCount) + 1 WHILE rid MATCHES LOWER(rkList) REPEAT
+            sampleList<rec_idx> = recList<rid>
+            rkList<-1> = rid
+        NEXT rec_idx
+    END
+
+    RETURN
+*-------------------------------------------------------------------------------
+SCAN.RECS:
+* TODO: Aggregate to link weights?
+
+    FOR rec_idx = 1 TO sampleCount
+
+        APP.ID = sampleList<rec_idx>
+        CALL F.READ(FN.APP, APP.ID, R.APP, F.APP, '')
+		
+        R.APP = APP.ID:@FM:R.APP
+        FINDSTR scan<2> IN R.APP SETTING fpos THEN
+            fieldNumber = fpos - 1
+            FIND fieldNumber IN fieldList SETTING fpos,vpos THEN
+                curFieldName = fieldList<fpos,1>
+                curLink = curApp:'>':curFieldName:'|':scan<1>:',type,scanned'
+                outp<-1> = curLink:',':ckpt:',':scan<2>:' in ':APP.ID
+            END ELSE
+                ERR = 'ERR_FIELD_NOT_FOUND'
+                GOTO ERR.HANDLER
+            END
+        END
+    NEXT rec_idx
 
     RETURN
 *-------------------------------------------------------------------------------
 GET.DATA.SUMMARY:
 
-    CALL EB.READLIST('SELECT ':FN.APP, recList, '', recCount, '')
-    outp<-1> = ssList<app_idx>:',wt_numrec,':recCount
-
-    GOSUB BUILD.SAMPLE.LIST
+    outp<-1> = curApp:',wt_numrec,':recCount
 
 * Extract field data
     volList = '' ; fillList = ''
@@ -141,7 +221,7 @@ GET.DATA.SUMMARY:
 * Field averages
     volrec = 0 ; fillrec = 0
     FOR fld_idx = 1 TO fieldCount
-        curAttr = ssList<app_idx>:'>':fieldList<fld_idx,1>
+        curAttr = curApp:'>':fieldList<fld_idx,1>
         IF volList<fld_idx> THEN
             volrec += volList<fld_idx>/sampleCount
             volList<fld_idx> = DROUND(volList<fld_idx>/sampleCount, 2)
@@ -156,49 +236,10 @@ GET.DATA.SUMMARY:
     NEXT fld_idx
 
 * Record averages
-    outp<-1> = ssList<app_idx>:',wt_volrec,':DROUND(volrec, 2)
-    outp<-1> = ssList<app_idx>:',wt_fillrec,':DROUND(fillrec, 2)
+    outp<-1> = curApp:',wt_volrec,':DROUND(volrec, 2)
+    outp<-1> = curApp:',wt_fillrec,':DROUND(fillrec, 2)
 
 * TODO: Scan for a particular expression (contract). Can be limited to id or module
-
-    RETURN
-*-----------------------------
-BUILD.SAMPLE.LIST:
-* Sample without replacement if more than maxSampleSize records
-
-    maxSampleSize = 30
-
-    IF recCount LE maxSampleSize THEN
-        sampleCount = recCount
-        sampleList = recList
-    END ELSE
-        sampleCount = maxSampleSize
-
-        rkList = ''
-        FOR rec_idx = 1 TO sampleCount
-            LOOP rid = RND(recCount) + 1 WHILE rid MATCHES LOWER(rkList) REPEAT
-            sampleList<rec_idx> = recList<rid>
-            rkList<-1> = rid
-        NEXT rec_idx
-    END
-
-    RETURN
-*-------------------------------------------------------------------------------
-INITIALISE:
-
-    FN.SS = 'F.STANDARD.SELECTION'
-    CALL OPF(FN.SS, F.SS)
-
-*    selc = 'SELECT F.FILE.CONTROL'
-*    CALL EB.READLIST(selc, fileControlList, '', fileControlCount, '')
-*    fileControlList = LOWER(fileControlList)
-
-    sels = "@ID:'|':PRODUCT"
-    selc = 'SELECT F.PGM.FILE SAVING EVAL "':sels:'"'
-    CALL EB.READLIST(selc, pgmFileList, '', pgmFileCount, '')
-    pgmFileList = CHANGE(pgmFileList, '|', @VM)
-
-    outp = ''
 
     RETURN
 *-------------------------------------------------------------------------------
@@ -206,7 +247,7 @@ WRITE.OUTP:
 
     OPENSEQ '&HOLD&',outf TO F.OUTP ELSE
         CREATE F.OUTP THEN
-            WRITESEQ 'object,property,value,checkpoint' TO F.OUTP ELSE NULL
+            WRITESEQ 'object,property,value,checkpoint,remark' TO F.OUTP ELSE NULL
         END
     END
 
@@ -217,6 +258,13 @@ WRITE.OUTP:
 
     WEOFSEQ F.OUTP
     CLOSESEQ F.OUTP
+
+    RETURN
+*-------------------------------------------------------------------------------
+ERR.HANDLER:
+
+    PRINT curApp:': ':ERR
+    IF NOT(scan) THEN outp<-1> = curApp:',ERROR,':ERR
 
     RETURN
 *************************************************************************
