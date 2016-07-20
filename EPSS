@@ -1,0 +1,187 @@
+*------------------------------------------------------------------------------
+* <Rating>-80</Rating>
+*------------------------------------------------------------------------------
+    SUBROUTINE EPSS(ldev, scan, ckpt)
+*------------------------------------------------------------------------------
+* ldev : local development prefixes array
+* scan : string to be scanned
+* ckpt : checkpoint to be recorded
+*------------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.STANDARD.SELECTION
+
+    GOSUB INITIALISE
+
+    selc = 'SELECT F.STANDARD.SELECTION WITH @ID UNLIKE NOFILE...'
+*    selc = 'SELECT F.STANDARD.SELECTION WITH @ID EQ "BASIC.INTEREST"'
+    CALL EB.READLIST(selc, ssList, '', ssCount, '')
+
+    FOR app_idx = 1 TO ssCount
+        FN.APP = 'F.':ssList<app_idx>
+        CALL OPF(FN.APP:@FM:'NO.FATAL.ERROR', F.APP)
+        IF ETEXT THEN
+            PRINT "OPF failed: ":ssList<app_idx>
+        END ELSE
+            GOSUB GET.MEMBERSHIP
+            GOSUB GET.APP.SUMMARY
+            GOSUB GET.DATA.SUMMARY
+        END
+    NEXT app_idx
+
+* TODO: Append in case of scanning for changes?
+    CALL OPF('&HOLD&', F.HOLD)
+    WRITE outp TO F.HOLD,'t24.csv'
+
+    PRINT "Elapsed time: ": TIME() - startTime
+
+    RETURN
+*-------------------------------------------------------------------------------
+GET.MEMBERSHIP:
+
+* Modularization of the system
+    FIND ssList<app_idx> IN pgmFileList SETTING fpos,vpos THEN
+        curm = pgmFileList<fpos,2>
+        IF NOT(curm) THEN
+            curm = 'ERR_NO_PRODUCT_IN_PGM.FILE'
+        END
+    END ELSE
+        curm = 'ERR_NOT_IN_PGM.FILE'
+    END
+
+    IF curm[1,4] EQ 'ERR_' THEN
+        PRINT curm:": ":ssList<app_idx>
+    END
+
+    outp<-1> = ssList<app_idx>:',mbrp,':curm
+
+* Division to core and local development
+
+
+    RETURN
+*-------------------------------------------------------------------------------
+GET.APP.SUMMARY:
+
+    CALL F.READ(FN.SS, ssList<app_idx>, R.SS, F.SS, '')
+
+    fieldList = ''
+
+    prevFieldNo = -1
+    sysFieldCount = DCOUNT(R.SS<SSL.SYS.FIELD.NAME>, @VM)
+    FOR ss_idx = 1 TO sysFieldCount
+
+        curFieldName = R.SS<SSL.SYS.FIELD.NAME,ss_idx>
+
+        BEGIN CASE
+        CASE R.SS<SSL.SYS.FIELD.NO,ss_idx> EQ prevFieldNo
+            CONTINUE
+        CASE R.SS<SSL.SYS.TYPE,ss_idx> NE 'D'
+            CONTINUE
+        CASE FIELD(curFieldName, 'RESERVE', 2, 1)
+            CONTINUE
+        CASE OTHERWISE
+            fieldList<-1> = curFieldName:@VM:R.SS<SSL.SYS.FIELD.NO,ss_idx>
+            prevFieldNo = R.SS<SSL.SYS.FIELD.NO,ss_idx>
+
+            relFile = R.SS<SSL.SYS.REL.FILE,ss_idx>
+            IF relFile THEN
+                curLink = ssList<app_idx>:'>':curFieldName:'|':relFile
+                outp<-1> = curLink:',type,defined'
+            END ELSE
+* TODO: If not data wt needed outl := ',attribute,':R.SS<SSL.SYS.FIELD.NAME,j>
+            END
+        END CASE
+    NEXT ss_idx
+
+    fieldCount = DCOUNT(fieldList, @FM)
+    outp<-1> = ssList<app_idx>:',wt_numattr,':fieldCount
+
+    RETURN
+*-------------------------------------------------------------------------------
+GET.DATA.SUMMARY:
+
+    CALL EB.READLIST('SELECT ':FN.APP, recList, '', recCount, '')
+    outp<-1> = ssList<app_idx>:',wt_numrec,':recCount
+
+    GOSUB BUILD.SAMPLE.LIST
+
+* Extract field data
+    volList = '' ; fillList = ''
+    FOR rec_idx = 1 TO sampleCount
+        CALL F.READ(FN.APP, sampleList<rec_idx>, R.APP, F.APP, '')
+        R.APP = sampleList<rec_idx>:@FM:R.APP
+        FOR fld_idx = 1 TO fieldCount
+            volList<fld_idx> += LEN(R.APP<fieldList<fld_idx,2>+1>)
+            fillList<fld_idx> += (R.APP<fieldList<fld_idx,2>+1> NE '')
+        NEXT fld_idx
+    NEXT rec_idx
+
+* TOD: volrec and voldattr seem to fit into one vol column
+
+* Field averages
+    volrec = 0 ; fillrec = 0
+    FOR fld_idx = 1 TO fieldCount
+        curAttr = ssList<app_idx>:'>':fieldList<fld_idx,1>
+        IF volList<fld_idx> THEN
+            volrec += volList<fld_idx>/sampleCount
+            volList<fld_idx> = DROUND(volList<fld_idx>/sampleCount, 2)
+        END
+        outp<-1> = curAttr:',wt_volattr,':volList<fld_idx>
+
+        IF fillList<fld_idx> THEN
+            fillrec += fillList<fld_idx>/sampleCount
+            fillList<fld_idx> = DROUND(fillList<fld_idx>/sampleCount, 2)
+        END
+        outp<-1> = curAttr:',wt_fillattr,':fillList<fld_idx>
+    NEXT fld_idx
+
+* Record averages
+    outp<-1> = ssList<app_idx>:',wt_volrec,':DROUND(volrec, 2)
+    outp<-1> = ssList<app_idx>:',wt_fillrec,':DROUND(fillrec, 2)
+
+* TODO: Scan for a particular expression (contract). Can be limited to id or module
+
+    RETURN
+*-----------------------------
+BUILD.SAMPLE.LIST:
+* Sample without replacement if more than maxSampleSize records
+
+    maxSampleSize = 30
+
+    IF recCount LE maxSampleSize THEN
+        sampleCount = recCount
+        sampleList = recList
+    END ELSE
+        sampleCount = maxSampleSize
+
+        rkList = ''
+        FOR rec_idx = 1 TO sampleCount
+            LOOP rid = RND(recCount) + 1 WHILE rid MATCHES LOWER(rkList) REPEAT
+            sampleList<rec_idx> = recList<rid>
+            rkList<-1> = rid
+        NEXT rec_idx
+    END
+
+    RETURN
+*-------------------------------------------------------------------------------
+INITIALISE:
+
+    startTime = TIME()
+
+    outp = 'object,property,value,checkpoint'
+
+    FN.SS = 'F.STANDARD.SELECTION'
+    CALL OPF(FN.SS, F.SS)
+
+*    selc = 'SELECT F.FILE.CONTROL'
+*    CALL EB.READLIST(selc, fileControlList, '', fileControlCount, '')
+*    fileControlList = LOWER(fileControlList)
+
+    sels = "@ID:'|':PRODUCT"
+    selc = 'SELECT F.PGM.FILE SAVING EVAL "':sels:'"'
+    CALL EB.READLIST(selc, pgmFileList, '', pgmFileCount, '')
+    pgmFileList = CHANGE(pgmFileList, '|', @VM)
+
+    RETURN
+*************************************************************************
+END
