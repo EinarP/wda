@@ -37,7 +37,8 @@ trf <- function(sq, trans, cl, ...) {
 
   # Remove what does not belong to new checkpoint
   if (!is.null(list(...)$checkpoint)) {
-    curang <- apply_checkpoint(curang)
+# TODO: Redo checkpoint concept    
+  #  curang <- apply_checkpoint(curang)
   }
   
   # Call the transformation function
@@ -265,7 +266,7 @@ browseSource <- function(type) {
       attribute=obs[grepl('>', obs$object) & !grepl('\\|', obs$object), ],
       relationship=obs[grepl('\\|', obs$object), ],
       all=obs)
-  
+    
     # Tidy up checkpoints for reshaping
     if (!is.element('checkpoint', names(obsl))) {
       obsl$checkpoint <- 'all'
@@ -275,10 +276,12 @@ browseSource <- function(type) {
     
     # Filter observations based on current checkpoint
     if (!(is.null(dsrc$checkpoint) | all)) {
-      obsl <- obsl[grep(paste0('all|', dsrc$checkpoint), obsl$checkpoint), ]
+#      obsl <- obsl[grep(paste0('all|', dsrc$checkpoint), obsl$checkpoint), ]
+      obsl <- obsl[obsl$checkpoint==dsrc$checkpoint, ]
     }
     
     # Convert from long to wide format
+    obsl <- unique(obsl[ ,1:4])
     obsw <- reshape(obsl, direction='wide',
       idvar=c('object','checkpoint'), timevar='property')
 
@@ -308,9 +311,9 @@ browseRelations <- browseSource('relationship')
 # TODO: Introduce 'type' attr for differentiating entities and attributes
 
 # User friendly transformation function call
-grow <- function(sq, cntr, depth=1, attrs=FALSE, vals=FALSE, ckpt=NA) {
+grow <- function(sq, cntr, depth=1, attrs=FALSE, vals=FALSE, ckpt=NA, ...) {
   trf(sq, 'center', cl=match.call(), centers=cntr,
-    depth=depth, attrs=attrs, vals=vals, checkpoint=ckpt)
+    depth=depth, attrs=attrs, vals=vals, checkpoint=ckpt, ...)
 }
 
 # Adding centers: entities, attributes, relations, values
@@ -345,7 +348,9 @@ add_entities <- function(center, depth, attrs, vals) {
   if (vals) add_values(tmpang, center)
   
   # add neighboring entities
-  if (depth > 0) {  
+  if (depth > 0) {
+
+    # TODO: browse relations only once (tmpobs?)
     obs <- browseRelations(tmpang)
     linkspec <- obs[obs$objsrc==center | obs$objdest==center, ]
     if (nrow(linkspec) > 0) {
@@ -417,20 +422,23 @@ add_values <- function(ang, centers) {
 }
 
 # Connect vertices
-add_link <- function(ang, vsrc, vdest, lnklabel) {
+add_link <- function(ang, vsrc, vdest, lnklabel, lnktype='defined') {
 
+#  ang <- set_edge_attr(ang, 'type',
+#                       index=attr(E(ang), 'vnames')==cname, value=csize)
+#  edge.lty
   if (ang$alternation) {
     linkname <- paste(paste(vsrc, lnklabel, sep='>'), vdest, sep='|')  
     if (!is.element(linkname, attr(E(tmpang), 'vnames'))) {
       newattr <- paste(vsrc, lnklabel, sep='>')
       ang <- add_attributes(ang, newattr)
-      ang <- ang + edge(newattr, vdest, edge.arrow.size=0.2, arrow.mode=2, width=1)
+      ang <- ang + edge(newattr, vdest, edge.arrow.size=0.2, arrow.mode=2, width=1, attr=list(type=lnktype))
     }
   } else {
     linkname <- paste(vsrc, vdest, sep='|')  
     if (!is.element(linkname, attr(E(ang), 'vnames'))) {
       ang <- ang + edge(vsrc, vdest,
-        label=lnklabel, edge.arrow.size=0.2, arrow.mode=2, width=1)
+        label=lnklabel, edge.arrow.size=0.2, arrow.mode=2, width=1, attr=list(type=lnktype))
     }
   }
   
@@ -952,8 +960,8 @@ getSimplicity <- function(sq, ...) {
 ################################################################################
 
 # User friendly transformation function call
-void <- function(sq, centers, ckpt=NA) {
-  trf(sq, 'thevoid', centers=centers, checkpoint=ckpt, cl=match.call())
+void <- function(sq, centers, ckpt=NA, ...) {
+  trf(sq, 'thevoid', centers=centers, checkpoint=ckpt, cl=match.call(), ...)
 }
 
 # Remove centers

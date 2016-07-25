@@ -70,6 +70,7 @@ INITIALISE:
     pgmFileList = CHANGE(pgmFileList, '|', @VM)
 
     outp = ''
+    otail = ',':ckpt:','
 
     RETURN
 *-------------------------------------------------------------------------------
@@ -113,7 +114,7 @@ OPEN.APP.FILE:
             relFile = R.SS<SSL.SYS.REL.FILE,ss_idx>
             IF relFile THEN
                 curLink = curApp:'>':curFieldName:'|':relFile
-                linkList<-1> = curLink:',type,defined'
+                linkList<-1> = curLink:',type,defined':otail
             END ELSE
 * TODO: If not data wt needed outl := ',attribute,':R.SS<SSL.SYS.FIELD.NAME,j>
             END
@@ -132,7 +133,7 @@ GET.MEMBERSHIP:
         IF NOT(curm) THEN
             curm = 'ERR_NO_PRODUCT_IN_PGM.FILE'
         END
-        outp<-1> = curApp:',mbrp,':curm
+        outp<-1> = curApp:',mbrp,':curm:otail
     END ELSE
         ERR = 'ERR_NOT_IN_PGM.FILE'
         GOTO ERR.HANDLER
@@ -145,7 +146,7 @@ GET.MEMBERSHIP:
 GET.APP.SUMMARY:
 
     IF linkList THEN outp<-1> = linkList
-    outp<-1> = curApp:',wt_numattr,':fieldCount
+    outp<-1> = curApp:',wt_numattr,':fieldCount:otail
 
     RETURN
 *-------------------------------------------------------------------------------
@@ -184,14 +185,15 @@ SCAN.RECS:
 
         APP.ID = sampleList<rec_idx>
         CALL F.READ(FN.APP, APP.ID, R.APP, F.APP, '')
-		
         R.APP = APP.ID:@FM:R.APP
+
         FINDSTR scan<2> IN R.APP SETTING fpos THEN
             fieldNumber = fpos - 1
             FIND fieldNumber IN fieldList SETTING fpos,vpos THEN
+* TODO: Fix reference to itself
                 curFieldName = fieldList<fpos,1>
-                curLink = curApp:'>':curFieldName:'|':scan<1>:',type,scanned'
-                outp<-1> = curLink:',':ckpt:',':scan<2>:' in ':APP.ID
+                curLink = curApp:'>':curFieldName:'|':scan<1>
+                outp<-1> = curLink:',type,scanned,':ckpt:',':scan<2>:' in ':APP.ID
             END ELSE
                 ERR = 'ERR_FIELD_NOT_FOUND'
                 GOTO ERR.HANDLER
@@ -203,7 +205,7 @@ SCAN.RECS:
 *-------------------------------------------------------------------------------
 GET.DATA.SUMMARY:
 
-    outp<-1> = curApp:',wt_numrec,':recCount
+    outp<-1> = curApp:',wt_numrec,':recCount:otail
 
 * Extract field data
     volList = '' ; fillList = ''
@@ -226,18 +228,18 @@ GET.DATA.SUMMARY:
             volrec += volList<fld_idx>/sampleCount
             volList<fld_idx> = DROUND(volList<fld_idx>/sampleCount, 2)
         END
-        outp<-1> = curAttr:',wt_volattr,':volList<fld_idx>
+        outp<-1> = curAttr:',wt_volattr,':volList<fld_idx>:otail
 
         IF fillList<fld_idx> THEN
             fillrec += fillList<fld_idx>/sampleCount
             fillList<fld_idx> = DROUND(fillList<fld_idx>/sampleCount, 2)
         END
-        outp<-1> = curAttr:',wt_fillattr,':fillList<fld_idx>
+        outp<-1> = curAttr:',wt_fillattr,':fillList<fld_idx>:otail
     NEXT fld_idx
 
 * Record averages
-    outp<-1> = curApp:',wt_volrec,':DROUND(volrec, 2)
-    outp<-1> = curApp:',wt_fillrec,':DROUND(fillrec, 2)
+    outp<-1> = curApp:',wt_volrec,':DROUND(volrec, 2):otail
+    outp<-1> = curApp:',wt_fillrec,':DROUND(fillrec, 2):otail
 
 * TODO: Scan for a particular expression (contract). Can be limited to id or module
 
@@ -264,7 +266,7 @@ WRITE.OUTP:
 ERR.HANDLER:
 
     PRINT curApp:': ':ERR
-    IF NOT(scan) THEN outp<-1> = curApp:',ERROR,':ERR
+    IF NOT(scan) THEN outp<-1> = curApp:',ERROR,':ERR:otail
 
     RETURN
 *************************************************************************

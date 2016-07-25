@@ -1,52 +1,62 @@
 ---
 title: "Generation"
 output:
+  html_document: default
   word_document: default
 ---
-This is analysis of LD module structure for understanding its loan schedule handling mechanisms
+This is the analysis of loan scheduling mechanisms
+
+## Context
 
 ```{r message=FALSE}
-#Common functions
+# Analysis functions
 source('func.R')
 
-#Load observations
-t24obs <- read.csv('../data/t24.csv', stringsAsFactors=FALSE)
+# Initialise the analysis sequence
+obs <- read.csv('../data/t24mb.csv', stringsAsFactors=FALSE, na.strings='')
+lsov <- newsq('Loan scheduling overview', 'obs')
 
-#Start from the root
-ldsch <- trsq('LD scheduling overview', 't24obs')
-ldsch <- addCenters(ldsch, 'LD.LOANS.AND.DEPOSITS')
+# Initial center candidates
+initList <- c('LD.LOANS.AND.DEPOSITS', 'AA.ARRANGEMENT')
+lsov <- grow(lsov, initList)
+applyLayout(lsov, layout='layout_components')
+```
+
+There are too many edges shown and most of them are not particularly useful in this context. Remove these and replace with connections based on record scan
+
+```{r}
+
+# Remove irrelevant centers
+keepList <- paste(c(initList, 'CUSTOMER'), collapse='|')
+voidList <- grep(keepList, getCenters(lsov)$name, invert=TRUE, value=TRUE)
+lsov <- void(lsov, voidList)
+lsov
+
+```
+
+## Value date
+Add scanned links and divide into two parallel sequences by module
+
+```{r}
+# Separate analysis branch for AA
+aasch <- void(lsov, 'LD.LOANS.AND.DEPOSITS', name='AA analysis')
+aasch <- grow(aasch, 'AA.ARRANGEMENT', ckpt='vdate')
+
+# Separate analysis branch for LD
+ldsch <- void(lsov, 'AA.ARRANGEMENT', name='LD analysis')
+ldsch <- grow(ldsch, 'LD.LOANS.AND.DEPOSITS', ckpt='vdate')
+
+# After checking source tables remove irrelevant entities
+keepList <- c('LD.LOANS.AND.DEPOSITS', 'LD.SCHEDULE.DEFINE', 'STMT.ENTRY')
+ldsch <- void(ldsch, !(getCenters(ldsch)$name %in% c(keepList, 'CUSTOMER')))
 ldsch
+
+aasch
 ```
 
-There are too many edges shown and none of them seems useful. Remove these and replace with connections based on record scan
+## Maturity date
 
-```{r}
-#Remove clutter
-getCenter(ldsch)
+## Archival
 
-voidList <- grep('LD', getCenter(ldsch), invert=TRUE, value=TRUE)
-ldsch <- voidCenter(ldsch, voidList)
-ldsch
-
-#addCenter(ldsch, 'LD.LOANS.AND.DEPOSITS', scan='LD')
-
-```
-
-We need to scale down to attribute level to understand the structure better. No reason to scale up
-
-```{r}
-#scaleDown(ldsch)
-```
-
-What can we conclude based on analysis
-
-PS. Demonstration that brute force is not helpful with igraph
-```{r}
-el <- obs[obs$property=='linkdef', ]
-
-from <- sub('>.*$', '', el$object)
-to <- gsub("^[^>]+>\\s*", "", el$object)
-
-plot(graph.data.frame(data.frame(from, to, el$value)))
-```
+What can we conclude based on analysis (or in word only?)
 
