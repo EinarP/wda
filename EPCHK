@@ -1,18 +1,31 @@
 *------------------------------------------------------------------------------
-* <Rating>760</Rating>
+* <Rating>971</Rating>
+*
+* TODO: Convert from SUBROUTINE to PROGRAM (company handling...)
 *------------------------------------------------------------------------------
     SUBROUTINE EPCHK
 *------------------------------------------------------------------------------
-* Output file in &HOLD& where to add the results
+* Output file in &HOLD& for results
     outf = 't24mb.csv'
 * Local development prefixes array
     ldev = ''
-* Record to be scanned [FILE:@ID]
-*    scan = ''
-    scan = 'LD.LOANS.AND.DEPOSITS':@FM:'LD1000598675'
 * Checkpoint to be recorded
-*    ckpt = ''
-    ckpt = 'vdate'
+    ckpt = 'baseline'
+* What are we going to do
+    doStructureExtraction = 0
+    doDataSummary = 0
+    doLinkScan = 0
+    doValueExtraction = 1
+* Table for link scanning and value extractionRecord to be scanned [FILE:@ID]
+    IF doLinkScan OR doValueExtraction THEN
+        svt = 'LD.LOANS.AND.DEPOSITS':@VM:'LD1000598675'
+        svt<-1> = 'LD.LOANS.AND.DEPOSITS':@VM:'LD1000505548'
+        svt<-1> = 'LD.LOANS.AND.DEPOSITS':@VM:'LD1000553495'
+        svt<-1> = 'AA.ARRANGEMENT':@VM:'AA10005FX65G'
+        svt<-1> = 'AA.ARRANGEMENT':@VM:'AA10005DY3B5'
+        svt<-1> = 'AA.ARRANGEMENT':@VM:'AA10005S6NPJ'
+        svtCount = DCOUNT(svt, @FM)
+    END
 * Sample size
     maxSampleSize = 30
 *------------------------------------------------------------------------------
@@ -21,42 +34,46 @@
     $INSERT I_F.STANDARD.SELECTION
     $INSERT I_F.COMPANY
 
-    startTime = TIME()
     GOSUB INITIALISE
 
-    selc = 'SELECT F.STANDARD.SELECTION WITH @ID UNLIKE NOFILE...'
-    CALL EB.READLIST(selc, ssList, '', ssCount, '')
+    GOSUB SELECT.SS.RECS
     FOR app_idx = 1 TO ssCount
 
         curApp = ssList<app_idx>
         GOSUB OPEN.APP.FILE
         IF ERR THEN CONTINUE
 
-* Process application descriptions
-        IF NOT(scan) THEN
+        IF doStructureExtraction THEN
             GOSUB GET.MEMBERSHIP
             GOSUB GET.APP.SUMMARY
         END
 
-* Process application records
-        GOSUB SELECT.APP.RECS
-        IF NOT(ERR) THEN
-            IF scan THEN
-                GOSUB SCAN.RECS
-            END ELSE
-                GOSUB GET.DATA.SUMMARY
+        IF doDataSummary OR doLinkScan THEN
+            GOSUB SELECT.APP.RECS
+            IF recCount THEN
+                IF doDataSummary THEN
+                    GOSUB GET.DATA.SUMMARY
+                END
+                IF doLinkScan THEN
+                    GOSUB DO.LINK.SCAN
+                END
             END
+        END
+
+        IF doValueExtraction THEN
+            GOSUB DO.VALUE.EXTRACTION
         END
 
         CLOSE F.APP
     NEXT app_idx
 
-    GOSUB WRITE.OUTP
-    PRINT "Elapsed time: ": TIME() - startTime
+    GOSUB FINALISE
 
     RETURN
 *-------------------------------------------------------------------------------
 INITIALISE:
+
+    startTime = TIME()
 
     FN.SS = 'F.STANDARD.SELECTION'
     CALL OPF(FN.SS, F.SS)
@@ -71,6 +88,25 @@ INITIALISE:
 
     outp = ''
     otail = ',':ckpt:','
+
+    RETURN
+*-------------------------------------------------------------------------------
+SELECT.SS.RECS:
+
+    ssList = ''
+
+    IF doStructureExtraction OR doDataSummary OR doLinkScan THEN
+        selc = 'SELECT F.STANDARD.SELECTION WITH @ID UNLIKE NOFILE...'
+        CALL EB.READLIST(selc, ssList, '', ssCount, '')
+    END ELSE
+        FOR svt_idx = 1 TO svtCount
+            curApp = svt<svt_idx,1>
+            FIND curApp IN ssList SETTING pos ELSE
+                ssList<-1> = curApp
+            END
+        NEXT svt_idx
+        ssCount = DCOUNT(ssList, @FM)
+    END
 
     RETURN
 *-------------------------------------------------------------------------------
@@ -126,6 +162,7 @@ OPEN.APP.FILE:
     RETURN
 *-------------------------------------------------------------------------------
 GET.MEMBERSHIP:
+* TODO: Local and core dev membership separation
 
 * Modularization of the system
     FIND curApp IN pgmFileList SETTING fpos,vpos THEN
@@ -152,7 +189,7 @@ GET.APP.SUMMARY:
 *-------------------------------------------------------------------------------
 SELECT.APP.RECS:
 
-    ERR = ''
+    recCount = 0
 
     FIND curApp IN fileControlList SETTING fpos THEN
         CALL EB.READLIST('SELECT ':FN.APP, recList, '', recCount, '')
@@ -162,7 +199,7 @@ SELECT.APP.RECS:
     END
 
 * Sample without replacement if more than maxSampleSize records
-    IF scan OR recCount LE maxSampleSize THEN
+    IF doLinkScan OR recCount LE maxSampleSize THEN
         sampleCount = recCount
         sampleList = recList
     END ELSE
@@ -175,31 +212,6 @@ SELECT.APP.RECS:
             rkList<-1> = rid
         NEXT rec_idx
     END
-
-    RETURN
-*-------------------------------------------------------------------------------
-SCAN.RECS:
-* TODO: Aggregate to link weights?
-
-    FOR rec_idx = 1 TO sampleCount
-
-        APP.ID = sampleList<rec_idx>
-        CALL F.READ(FN.APP, APP.ID, R.APP, F.APP, '')
-        R.APP = APP.ID:@FM:R.APP
-
-        FINDSTR scan<2> IN R.APP SETTING fpos THEN
-            fieldNumber = fpos - 1
-            FIND fieldNumber IN fieldList SETTING fpos,vpos THEN
-* TODO: Fix reference to itself
-                curFieldName = fieldList<fpos,1>
-                curLink = curApp:'>':curFieldName:'|':scan<1>
-                outp<-1> = curLink:',type,scanned,':ckpt:',':scan<2>:' in ':APP.ID
-            END ELSE
-                ERR = 'ERR_FIELD_NOT_FOUND'
-                GOTO ERR.HANDLER
-            END
-        END
-    NEXT rec_idx
 
     RETURN
 *-------------------------------------------------------------------------------
@@ -241,11 +253,67 @@ GET.DATA.SUMMARY:
     outp<-1> = curApp:',wt_volrec,':DROUND(volrec, 2):otail
     outp<-1> = curApp:',wt_fillrec,':DROUND(fillrec, 2):otail
 
+    RETURN
+*-------------------------------------------------------------------------------
+DO.LINK.SCAN:
 * TODO: Scan for a particular expression (contract). Can be limited to id or module
+* TODO: Aggregate to link weights?
+
+    FOR rec_idx = 1 TO recCount
+
+        APP.ID = recList<rec_idx>
+        CALL F.READ(FN.APP, APP.ID, R.APP, F.APP, '')
+
+        R.APP = APP.ID:@FM:R.APP
+        FOR svt_idx = 1 TO svtCount
+            cursc = RAISE(svt<svt_idx>)
+            FINDSTR cursc<2> IN R.APP SETTING fpos THEN
+                fieldNumber = fpos - 1
+                FIND fieldNumber IN fieldList SETTING fpos,vpos THEN
+* TODO: Fix reference to itself
+                    curFieldName = fieldList<fpos,1>
+                    opv = curApp:'>':curFieldName:'|':cursc<1>:',type,scanned'
+                    instance = curApp:'>':APP.ID:'>':curFieldName
+                    GOSUB outputLine
+                END ELSE
+                    ERR = 'ERR_FIELD_NOT_FOUND'
+                    GOTO ERR.HANDLER
+                END
+            END
+        NEXT svt_idx
+    NEXT rec_idx
 
     RETURN
 *-------------------------------------------------------------------------------
-WRITE.OUTP:
+DO.VALUE.EXTRACTION:
+
+    FOR svt_idx = 1 TO svtCount
+        IF svt<svt_idx,1> EQ curApp THEN
+            APP.ID = svt<svt_idx,2>
+            CALL F.READ(FN.APP, APP.ID, R.APP, F.APP, '')
+            IF R.APP THEN
+                FOR fld_idx = 1 TO fieldCount
+                    FIND fld_idx IN fieldList SETTING fpos,vpos THEN
+                        curFieldName = fieldList<fpos,1>
+                        opv = curApp:'>':curFieldName:',value,':R.APP<fld_idx>
+                        instance = curApp:'>':APP.ID:'>':curFieldName
+                        GOSUB outputLine
+                    END
+                NEXT fld_idx
+            END
+        END
+    NEXT svt_idx
+
+    RETURN
+*-------------------------------------------------------------------------------
+outputLine:
+
+    tmpoutp = opv:',':ckpt:',':instance
+    outp<-1> = CHANGE(CHANGE(tmpoutp, @SM, '|'), @VM, '_')
+
+    RETURN
+*-------------------------------------------------------------------------------
+FINALISE:
 
     OPENSEQ '&HOLD&',outf TO F.OUTP ELSE
         CREATE F.OUTP THEN
@@ -261,12 +329,14 @@ WRITE.OUTP:
     WEOFSEQ F.OUTP
     CLOSESEQ F.OUTP
 
+    PRINT "Elapsed time: ": TIME() - startTime
+
     RETURN
 *-------------------------------------------------------------------------------
 ERR.HANDLER:
 
     PRINT curApp:': ':ERR
-    IF NOT(scan) THEN outp<-1> = curApp:',ERROR,':ERR:otail
+    IF NOT(svt) THEN outp<-1> = curApp:',ERROR,':ERR:otail
 
     RETURN
 *************************************************************************

@@ -6,13 +6,45 @@ library(igraph, quietly=TRUE)
 ################################################################################
 
 # Contruct the transformations sequence object
-newsq <- function(name, data, ...) {
+newsq <- function(name, datasrc, ...) {
+
+  obsl <- get(datasrc)
+  
+  # Tidy up checkpoints for reshaping
+  if (!is.element('checkpoint', names(obsl))) {
+    obsl$checkpoint <- 'all'
+  } else {
+    obsl[is.na(obsl$checkpoint),'checkpoint'] <- 'all'
+  }
+  
+  # Convert from long to wide format
+  obsl <- unique(obsl[ ,1:4])
+  obsw <- reshape(obsl, direction='wide',
+    idvar=c('object','checkpoint'), timevar='property')
+  
+  # Concert weights to numeric
+  wtcol <- grep('wt_', names(obsw))
+  obsw[ ,wtcol] <- apply(obsw[ ,wtcol], 2, as.numeric)
+  
+  # Append helper columns
+  objsplit <- strsplit(sub('\\|', '>', obsw$object), '>', fixed=TRUE)
+  obsw$objsrc <- sapply(objsplit, function(x) x[1])
+  obsw$objattr <- sapply(objsplit, function(x) x[2])
+  obsw$objdest <- sapply(objsplit, function(x) x[3])
+  
+  # Tidy up
+  names(obsw) <- gsub('value.', '', names(obsw))
+  obsw <- obsw[with(obsw, order(object, checkpoint)), ]
+  
+  # Caching of the long to wide transformation
+  datasrcw <- paste(datasrc) 
+  assign(paste0(datasrc,'w'), obsw, envir=.GlobalEnv)
 
   # Empty graph with default settings  
   ang <- set_trsq_attr(graph.empty(), match.call(),
 
     # Generic (sequence or multi-step) metadata
-    name=name, data=data, checkpoint=NA, output='plot',
+    name=name, data=datasrc, checkpoint=NA, output='plot',
 
     # Global properties with no default value
     partitioning=NA, scaling=NA, symmetry=NA, sizing=NA, layout=NA, 
@@ -74,7 +106,9 @@ set_trsq_attr <- function(ang, cl, ...) {
     curname <- names(aargs[idx])
     isKnownName <- is.element(curname, list.graph.attributes(ang))
     if (substr(ang$transformation, 1, 5) == 'newsq' | isKnownName) {
-      ang <- set_graph_attr(ang, curname, aargs[[idx]])
+      if (!is.null(aargs[[idx]])) {
+        ang <- set_graph_attr(ang, curname, aargs[[idx]]) 
+      }
     }
   }
   
@@ -251,67 +285,39 @@ multiplot.trsq <- function(sq, fun, items) {
 ################################################################################
 
 # Explore center candidates
-browseSource <- function(type) {
-
-  function(dsrc, all=FALSE) {
+browseData <- function(sq, all=FALSE) {
   
-    if(class(dsrc)=='trsq') dsrc <- tail(dsrc, 1)[[1]]
+  if(class(sq)=='trsq') sq <- tail(sq, 1)[[1]]
   
-    # Connect the data source
-    obs <- get(dsrc$data)
+  obsw <- get(paste0(sq$data,'w'))
 
-    # Subset based on object type
-    obsl <- switch(type, 
-      entity=obs[!grepl('>', obs$object), ],
-      attribute=obs[grepl('>', obs$object) & !grepl('\\|', obs$object), ],
-      relationship=obs[grepl('\\|', obs$object), ],
-      all=obs)
-    
-    # Tidy up checkpoints for reshaping
-    if (!is.element('checkpoint', names(obsl))) {
-      obsl$checkpoint <- 'all'
-    } else {
-      obsl[is.na(obsl$checkpoint), 'checkpoint'] <- 'all' 
-    }
-    
-    # Filter observations based on current checkpoint
-    if (!(is.null(dsrc$checkpoint) | all)) {
-#      obsl <- obsl[grep(paste0('all|', dsrc$checkpoint), obsl$checkpoint), ]
-      obsl <- obsl[obsl$checkpoint==dsrc$checkpoint, ]
-    }
-    
-    # Convert from long to wide format
-    obsl <- unique(obsl[ ,1:4])
-    obsw <- reshape(obsl, direction='wide',
-      idvar=c('object','checkpoint'), timevar='property')
-
-    # Concert weights to numeric
-    wtcol <- grep('wt_', names(obsw))
-    obsw[ ,wtcol] <- apply(obsw[ ,wtcol], 2, as.numeric)
-    
-    # Append helper columns
-    objsplit <- strsplit(sub('\\|', '>', obsw$object), '>', fixed=TRUE)
-    obsw$objsrc <- sapply(objsplit, function(x) x[1])
-    obsw$objattr <- sapply(objsplit, function(x) x[2])
-    obsw$objdest <- sapply(objsplit, function(x) x[3])
-
-    # Return observations in wide format
-    names(obsw) <- gsub('value.', '', names(obsw))
-    obsw[with(obsw, order(object, checkpoint)), ]
+  # Filter based on checkpoint
+  if (!all) {
+    if (is.na(sq$checkpoint)) sq$checkpoint <- 'all'
+    obsw <- subset(obsw, checkpoint==sq$checkpoint)
   }
-}  
+  
+  obsw
+}
 
-browseData <- browseSource('all')
-browseEntities <- browseSource('entity')
-browseAttributes <- browseSource('attribute')
-browseRelations <- browseSource('relationship')
+browseEntities <- function(sq) {
+  subset(browseData(sq), is.na(objattr))
+}
+
+browseAttributes <- function(sq) {
+  subset(browseData(sq), !is.na(objattr) & is.na(objdest))
+}
+
+browseRelations <- function(sq) {
+  subset(browseData(sq), !is.na(objdest))
+}
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # TODO: Introduce 'type' attr for differentiating entities and attributes
 
 # User friendly transformation function call
-grow <- function(sq, cntr, depth=1, attrs=FALSE, vals=FALSE, ckpt=NA, ...) {
+grow <- function(sq, cntr, depth=1, attrs=FALSE, vals=FALSE, ckpt=NULL, ...) {
   trf(sq, 'center', cl=match.call(), centers=cntr,
     depth=depth, attrs=attrs, vals=vals, checkpoint=ckpt, ...)
 }
@@ -319,9 +325,10 @@ grow <- function(sq, cntr, depth=1, attrs=FALSE, vals=FALSE, ckpt=NA, ...) {
 # Adding centers: entities, attributes, relations, values
 center <- function(ang, ...) {
   
-  # Temporary global graph
+  # Temporary global graph and related observations
   tmpang <<- ang
-
+  tmpobs <<- browseRelations(ang)
+  
   # Arbitrary attributes
   aargs <- list(...)
   
@@ -336,30 +343,35 @@ center <- function(ang, ...) {
 # Add centers and their neighbors
 add_entities <- function(center, depth, attrs, vals) {
   
-  # add head center if not present
+  obslnk <- tmpobs[tmpobs$objsrc==center | tmpobs$objdest==center, ]
+  
+  # Add entity if not present
   if (!is.element(center, V(tmpang)$name)) {
     
     # TODO: size related to space, if not present use center type defults
-    tmpang <<- tmpang + vertices(center, label=center, shape='square', size=15)
+    tmpang <<- tmpang + vertices(center, label=center, type='entity', shape='square', size=15)
   }
   
   # Add attributes and values
   if (attrs) add_attributes(tmpang, center, vals)
   if (vals) add_values(tmpang, center)
   
-  # add neighboring entities
-  if (depth > 0) {
-
-    # TODO: browse relations only once (tmpobs?)
-    obs <- browseRelations(tmpang)
-    linkspec <- obs[obs$objsrc==center | obs$objdest==center, ]
-    if (nrow(linkspec) > 0) {
-      apply(linkspec, 1, function(clnk) {
+  # Add neighboring entities and update links
+  if (nrow(obslnk) > 0) {
+    apply(obslnk, 1, function(clnk) {
+      
         nextcenter <- ifelse(clnk['objsrc']==center, clnk['objdest'], clnk['objsrc'])
-        add_entities(nextcenter, depth-1, attrs, vals)
-        tmpang <<- add_link(tmpang, clnk['objsrc'], clnk['objdest'], clnk['objattr'])
-      })
-    }
+      
+        if (depth > 0) {
+          add_entities(nextcenter, depth-1, attrs, vals)
+        }
+        
+        entities <- getCenters(tmpang, ctype='entity')$name
+        if (nextcenter %in% entities) {
+          tmpang <<- add_link(tmpang, clnk['objsrc'],
+            clnk['objdest'], elabel=clnk['objattr'], etype=clnk['type'])
+        }
+    })
   }
 }
 
@@ -379,15 +391,25 @@ add_attributes <- function(ang, centers, vals=FALSE) {
     attrspec <- obs[is.element(obs$objsrc, centers), ]
   }
   
+  # Add all attribute if found
   if (nrow(attrspec)) {
+    links <- getRelations(ang)
     apply(attrspec, 1, function(cattr) {
-      if (!is.element(cattr['object'], V(tmpang)$name)) {
-        tmpang <<- tmpang + vertices(cattr['object'], label=cattr['objattr'], 
-          shape='circle', size=5)
+      links <- links[grepl(paste0(cattr['objsrc'], '|'), links$name), ]
+      
+      # Add attribute if not already present
+      newattr <- unname(cattr['object'])
+      attrlink <- paste(cattr['objsrc'], newattr, sep='|') 
+      if (!attrlink %in% links$name) {
         
-#        tmpang <<- add_link(tmpang, cattr['objsrc'], cattr['object'])
-        tmpang <<- tmpang + edge(cattr['objsrc'], cattr['object'], 
-          id=cattr['object'], label=NA, arrow.mode=0, width=1)
+        # Add attribute if related link to present
+        newlabel <- unname(cattr['objattr'])
+        if (!newattr %in% V(ang)$name) {
+          aattr <- list(name=newattr, label=newlabel)
+          aattr <- c(aattr, shape='circle', type='attribute', size=5)
+          ang <<- add_vertices(tmpang, 1, attr=aattr)
+          tmpang <<- add_link(ang, cattr['objsrc'], newattr, etype='association')
+        }
       }
       
       if (vals) add_values(tmpang, cattr['object'])
@@ -422,24 +444,38 @@ add_values <- function(ang, centers) {
 }
 
 # Connect vertices
-add_link <- function(ang, vsrc, vdest, lnklabel, lnktype='defined') {
+add_link <- function(ang, vsrc, vdest, elabel=NA, etype='defined') {
+# TODO: Convert attribute to link if already exists
+  
+  elabel <- unname(elabel)
+  etype <- unname(etype)
+  
+  # TODO: Link width
+  lattr <- list(width=1)
+  
+  # Line type according to link type
+  lattr <- c(lattr, type=etype, lty=ifelse(etype=='scanned', 'dashed', 'solid'))
 
-#  ang <- set_edge_attr(ang, 'type',
-#                       index=attr(E(ang), 'vnames')==cname, value=csize)
-#  edge.lty
-  if (ang$alternation) {
-    linkname <- paste(paste(vsrc, lnklabel, sep='>'), vdest, sep='|')  
-    if (!is.element(linkname, attr(E(tmpang), 'vnames'))) {
-      newattr <- paste(vsrc, lnklabel, sep='>')
-      ang <- add_attributes(ang, newattr)
-      ang <- ang + edge(newattr, vdest, edge.arrow.size=0.2, arrow.mode=2, width=1, attr=list(type=lnktype))
-    }
+  # Create different types of links
+  if (etype=='association') {
+    lattr <- c(lattr, arrow.mode=0)
+    ang <- add.edges(ang, c(vsrc,vdest), attr=lattr)
   } else {
-    linkname <- paste(vsrc, vdest, sep='|')  
-    if (!is.element(linkname, attr(E(ang), 'vnames'))) {
-      ang <- ang + edge(vsrc, vdest,
-        label=lnklabel, edge.arrow.size=0.2, arrow.mode=2, width=1, attr=list(type=lnktype))
-    }
+    if (ang$alternation) {
+      linkname <- paste(paste(vsrc, elabel, sep='>'), vdest, sep='|')  
+      if (!is.element(linkname, attr(E(ang), 'vnames'))) {
+        newattr <- paste(vsrc, elabel, sep='>')
+        ang <- add_attributes(ang, newattr)
+        lattr <- c(lattr, arrow.mode=2)
+        ang <- add.edges(ang, c(newattr,vdest), attr=lattr)
+      }
+    } else {
+      linkname <- paste(vsrc, vdest, sep='|')  
+      if (!is.element(linkname, attr(E(ang), 'vnames'))) {
+        lattr <- c(lattr, label=elabel, arrow.mode=2)
+        ang <- add.edges(ang, c(vsrc,vdest), attr=lattr)
+      }
+    } 
   }
   
   ang
@@ -448,16 +484,20 @@ add_link <- function(ang, vsrc, vdest, lnklabel, lnktype='defined') {
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Retrieve current centers
-getCenters <- function(sq) {
+getCenters <- function(sq, ctype=NA) {
   
-  # TODO: Implement get_ang
   if (class(sq) == 'trsq') {
     ang <- tail(sq, 1)[[1]]
   } else {
     ang <- sq
   }
 
-  data.frame(get.vertex.attribute(ang), stringsAsFactors=FALSE)
+  centers <- data.frame(get.vertex.attribute(ang), stringsAsFactors=FALSE)
+  if (is.na(ctype)) {
+    centers
+  } else {
+    centers[centers$type==ctype, ]
+  }
 }
 
 # Retrieve current relationships
@@ -582,6 +622,8 @@ removeAlternation <- function(sq) {
 # Transformation function
 alternation <- function(ang, ...) {
 
+# TODO: type property handling
+  
   for(idx in seq_along(E(ang))) {  
     
     objsrc <- sub('\\|.*', '', attr(E(ang)[idx], 'vnames'))
@@ -591,17 +633,18 @@ alternation <- function(ang, ...) {
     if (ang$alternation) {
       if (!grepl('>', attr(E(ang)[idx], 'vnames'))) {
         
-        objattr <- E(ang)[idx]$label
-        ang <- add_link(ang, objsrc, objdest, objattr)
+        objlbl <- E(ang)[idx]$label
+        objtype <- E(ang)[idx]$type
+        ang <- add_link(ang, objsrc, objdest, elabel=objlbl, etype=objtype)
         
         E(ang)[idx]$label <- 'DELETE'
       }
     } else {
       if (grepl('>', objsrc)) {
-        
+      
         objattr <- sub('.*>', '', objsrc)
         newobjsrc <- sub('>.*', '', objsrc)
-        ang <- add_link(ang, newobjsrc, objdest, objattr)
+        ang <- add_link(ang, newobjsrc, objdest, elabel=objattr)
         
         V(ang)[objsrc]$label <- 'DELETE'
       }
@@ -960,7 +1003,7 @@ getSimplicity <- function(sq, ...) {
 ################################################################################
 
 # User friendly transformation function call
-void <- function(sq, centers, ckpt=NA, ...) {
+void <- function(sq, centers, ckpt=NULL, ...) {
   trf(sq, 'thevoid', centers=centers, checkpoint=ckpt, cl=match.call(), ...)
 }
 

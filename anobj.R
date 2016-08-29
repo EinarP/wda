@@ -16,7 +16,7 @@ anobj <- trsq('Analysis object', 'anobs')
 # Create centers
 anobj <- addCenters(anobj, 'SEQUENCE', depth=2)
 
-# Apply appropriate seed and partition
+# Apply appropriate seed and partitioning
 anobj <- applySeed(sq=anobj, seed=163)
 anobj <- applyBoundary(anobj, 'member')
 anobj
