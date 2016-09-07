@@ -6,9 +6,9 @@ library(igraph, quietly=TRUE)
 ################################################################################
 
 # Contruct the transformations sequence object
-newsq <- function(name, datasrc, ...) {
+analysis <- function(name, dataref, ...) {
 
-  obsl <- get(datasrc)
+  obsl <- get(dataref)
   
   # Tidy up checkpoints for reshaping
   if (!is.element('checkpoint', names(obsl))) {
@@ -36,15 +36,14 @@ newsq <- function(name, datasrc, ...) {
   names(obsw) <- gsub('value.', '', names(obsw))
   obsw <- obsw[with(obsw, order(object, checkpoint)), ]
   
-  # Caching of the long to wide transformation
-  datasrcw <- paste(datasrc) 
-  assign(paste0(datasrc,'w'), obsw, envir=.GlobalEnv)
+  # Caching of long to wide transformation
+  assign(paste0(dataref,'w'), obsw, envir=.GlobalEnv)
 
   # Empty graph with default settings  
   ang <- set_trsq_attr(graph.empty(), match.call(),
 
     # Generic (sequence or multi-step) metadata
-    name=name, data=datasrc, checkpoint=NA, output='plot',
+    name=name, data=dataref, checkpoint=NA, output='plot',
 
     # Global properties with no default value
     partitioning=NA, scaling=NA, symmetry=NA, sizing=NA, layout=NA, 
@@ -95,17 +94,14 @@ set_trsq_attr <- function(ang, cl, ...) {
   
   # Mandatory attributes
   ang$dtstamp <- Sys.time()
-  
-#  if (class(cl) == 'call') {
-    ang$transformation <- gsub(' = ', '=', deparse(cl))[1]
-#  }
+  ang$transformation <- gsub(' = ', '=', deparse(cl))[1]
   
   # Arbitrary attributes
   aargs <- list(...)
   for (idx in seq_along(aargs)) {
     curname <- names(aargs[idx])
     isKnownName <- is.element(curname, list.graph.attributes(ang))
-    if (substr(ang$transformation, 1, 5) == 'newsq' | isKnownName) {
+    if (substr(ang$transformation, 1, 8) == 'analysis' | isKnownName) {
       if (!is.null(aargs[[idx]])) {
         ang <- set_graph_attr(ang, curname, aargs[[idx]]) 
       }
@@ -188,10 +184,9 @@ print.trsq <- function(sq, ...) {
 
 # Output last graph of the sequence
 plot.trsq <- function(sq, title='plot1') {
-
-  ang <- tail(sq, 1)[[1]]
-  plopt <- list(xlab=title)
   
+  ang <- tail(sq, 1)[[1]]
+
   # Set random number generator
   set.seed(ang$seed)
   
@@ -201,7 +196,14 @@ plot.trsq <- function(sq, title='plot1') {
   } else {
     layout <- do.call(ang$layout, list(ang))
   }
+
+  # Determine plotting options  
+  plopt <- list(xlab=title)
+  thmopt <- get_plopt(ang$theme)
   
+  V(ang)$color <- thmopt$vertex_color
+  V(ang)[V(ang)$contrast]$color <- thmopt$vertex_contrast_color
+
   # Simplified/full presentation
   # Non-essential sans names? etc in the background
   if (ang$simplicity) {
@@ -222,7 +224,7 @@ plot.trsq <- function(sq, title='plot1') {
   # Apply theme
   if (ang$theme == 'expressive') {
     if (is.na(ang$partitioning)) {
-      V(ang)$color <- 'orange1'
+      
     } else if (ang$simplicity) {
       mbrpn <- as.numeric(as.factor(membership(V(ang))))
       #palette <- colorRampPalette(c('yellow','brown'), alpha=0.8)
@@ -233,7 +235,7 @@ plot.trsq <- function(sq, title='plot1') {
   }
   if (ang$theme == 'minimalist') {
     if (is.na(ang$partitioning)) {
-      V(ang)$color <- 'lightgrey'
+
     } else if (ang$simplicity) {
       mbrpn <- as.numeric(as.factor(membership(V(ang))))
       colrs <- gray.colors(max(mbrpn))[mbrpn]
@@ -289,7 +291,7 @@ browseData <- function(sq, all=FALSE) {
   
   if(class(sq)=='trsq') sq <- tail(sq, 1)[[1]]
   
-  obsw <- get(paste0(sq$data,'w'))
+  obsw <- get(paste0(sq$data, 'w'))
 
   # Filter based on checkpoint
   if (!all) {
@@ -306,6 +308,11 @@ browseEntities <- function(sq) {
 
 browseAttributes <- function(sq) {
   subset(browseData(sq), !is.na(objattr) & is.na(objdest))
+}
+
+# TODO: Implement function
+browseValues <- function(sq) {
+  browseData(sq)
 }
 
 browseRelations <- function(sq) {
@@ -347,9 +354,11 @@ add_entities <- function(center, depth, attrs, vals) {
   
   # Add entity if not present
   if (!is.element(center, V(tmpang)$name)) {
-    
-    # TODO: size related to space, if not present use center type defults
-    tmpang <<- tmpang + vertices(center, label=center, type='entity', shape='square', size=15)
+
+    # TODO: Separate meaning from presentation (shape and size)    
+    eattr <- list(name=center, label=center, type='entity', contrast=FALSE)
+    eattr <- c(eattr, shape='square', size=15)
+    tmpang <<- add_vertices(tmpang, 1, attr=eattr)
   }
   
   # Add attributes and values
@@ -366,6 +375,7 @@ add_entities <- function(center, depth, attrs, vals) {
           add_entities(nextcenter, depth-1, attrs, vals)
         }
         
+        # TODO: Convert an attribute to a link if present
         entities <- getCenters(tmpang, ctype='entity')$name
         if (nextcenter %in% entities) {
           tmpang <<- add_link(tmpang, clnk['objsrc'],
@@ -375,13 +385,16 @@ add_entities <- function(center, depth, attrs, vals) {
   }
 }
 
-# Add elements
-add_attributes <- function(ang, centers, vals=FALSE) {
+# Add attribute elements
+add_attributes <- function(ang, centers, vals=FALSE, atype='attribute') {
+  
+  # TODO: Shape selection should be part of theme
+  ashape <- ifelse(atype=='attribute', 'circle', 'raster')
   
   # Temporary global graph
   tmpang <<- ang
   
-  # Either attribute or related entity can be passed
+  # Either an attribute or related entity can be passed
   if (grepl('>', centers)) {
     objsrc <- sub('>.*', '', centers)
     objattr <- sub('.*>', '', centers)
@@ -391,22 +404,18 @@ add_attributes <- function(ang, centers, vals=FALSE) {
     attrspec <- obs[is.element(obs$objsrc, centers), ]
   }
   
-  # Add all attribute if found
+  # Add all attributes if not already present
   if (nrow(attrspec)) {
     links <- getRelations(ang)
     apply(attrspec, 1, function(cattr) {
-      links <- links[grepl(paste0(cattr['objsrc'], '|'), links$name), ]
-      
-      # Add attribute if not already present
+      clinks <- links[grepl(paste0(cattr['objsrc'], '\\|'), links$name), ]
       newattr <- unname(cattr['object'])
       attrlink <- paste(cattr['objsrc'], newattr, sep='|') 
-      if (!attrlink %in% links$name) {
-        
-        # Add attribute if related link to present
+      if (!attrlink %in% clinks$name & !cattr['objattr'] %in% clinks$label) {
         newlabel <- unname(cattr['objattr'])
         if (!newattr %in% V(ang)$name) {
           aattr <- list(name=newattr, label=newlabel)
-          aattr <- c(aattr, shape='circle', type='attribute', size=5)
+          aattr <- c(aattr, shape=ashape, type=atype, size=5, contrast=FALSE)
           ang <<- add_vertices(tmpang, 1, attr=aattr)
           tmpang <<- add_link(ang, cattr['objsrc'], newattr, etype='association')
         }
@@ -445,13 +454,14 @@ add_values <- function(ang, centers) {
 
 # Connect vertices
 add_link <- function(ang, vsrc, vdest, elabel=NA, etype='defined') {
-# TODO: Convert attribute to link if already exists
   
   elabel <- unname(elabel)
   etype <- unname(etype)
   
+  # TODO: Convert attribute to link if already exists
+  
   # TODO: Link width
-  lattr <- list(width=1)
+  lattr <- list(width=1, contrast=FALSE)
   
   # Line type according to link type
   lattr <- c(lattr, type=etype, lty=ifelse(etype=='scanned', 'dashed', 'solid'))
@@ -590,17 +600,23 @@ getPartitioning <- function(sq) {
 ################################################################################
 
 # User friendly transformation function call
-applyScaling <- function(sq, scaling) {
+doScaling <- function(sq, scaling) {
     trf(sq, 'scale', scaling=scaling, cl=match.call())
 }
 
+# TODO: Implement the function
 scale <- function(ang, ...) {
-  ang
+
+  vl <- c("OBSERVATION>checkpoint","VERTEX>label","VERTEX>shape","VERTEX>type")
+  vl <- c(vl,"GRAPH>alternation","GRAPH>checkpoint","GRAPH>gradient","GRAPH>layout","GRAPH>scaling")
+  vl <- c(vl,"GRAPH>seed","GRAPH>simplicity","GRAPH>symmetry","GRAPH>theme","EDGE>type")
+
+  thevoid(ang, centers=vl)
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Current scaling settings
+# TODO: Current scaling settings => obsolete?
 getScaling <- function(sq) {
   tail(sq, 1)[[1]]$scaling
 }
@@ -686,7 +702,7 @@ symmetry <- function(ang, ...) {
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Get current symmerty settings
+# TODO: Get current symmerty settings => obsolete?
 getSymmetry <- function(sq) {
   tail(sq, 1)[[1]]$symmetry
 }
@@ -694,6 +710,11 @@ getSymmetry <- function(sq) {
 ################################################################################
 # SPACE transformations
 ################################################################################
+
+# TODO: Implement function
+browseSizings <- function(sq) {
+  
+}
 
 # User friendly transformation function call
 applySizing <- function(sq, method=NULL) {
@@ -758,6 +779,11 @@ space_pregiven <- function(ang, method) {
   ang  
 }
 
+# TODO: Implement function
+removeSizing <- function(sq) {
+  
+}
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Get current sizing algorithm or source data
@@ -812,7 +838,7 @@ getSeed <- function(sq) {
 # Remote Centers without attributes as well?
 
 # User friendly transformation function call
-applyGradient <- function(sq, center) {
+doGradients <- function(sq, center) {
   trf(sq, 'gradient', center=center, cl=match.call())
 }
 
@@ -825,7 +851,7 @@ gradient <- function(ang, ...) {
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Get current gradient settings
+# TODO: Get current gradient settings => obsolete?
 getGradient <- function(sq) {
   tail(sq, 1)[[1]]$gradient
 }
@@ -834,18 +860,25 @@ getGradient <- function(sq) {
 # CONTRAST transformations
 ################################################################################
 
-# Highlight paths (kateto.net good example?) and perhaps also centers/attributes
+# Highlight parts of the structure
+# TODO: Highlight links, values, perhaps even paths as well
 
 # User friendly transformation function call
-highlight <-  function(sq, ...) {
-  trf(sq, 'contrast', cl=match.call())
+applyHighlight <-  function(sq, centers, ...) {
+  trf(sq, 'contrast', centers=centers, highlight=TRUE, cl=match.call())
 }
 
-dehighlight <-  function(sq, ...) {
-  trf(sq, 'contrast', cl=match.call())
+removeHighlight <-  function(sq, centers, ...) {
+  trf(sq, 'contrast', centers=centers, highlight=FALSE, cl=match.call())
 }
 
 contrast <- function(ang, ...) {
+  
+  centers <- list(...)$centers
+  hlc <- V(ang)$name %in% centers
+  
+  hl <- list(...)$highlight
+  ang <- set_vertex_attr(ang, 'contrast', index=hlc, value=hl)
   
   ang
 }
@@ -855,31 +888,38 @@ contrast <- function(ang, ...) {
 ################################################################################
 
 # Can be useful for handling repeating blocks like audit fields
+# TODO: Group by community parameter
+# TODO: Group by community parameter 
 
 # User friendly transformation function call
-# Group centers and attributes to logical units
 group <- function(sq, group, members, ...) {
-  trf(sq, 'interlock', cl=match.call())
+  trf(sq, 'interlock', group=group, members=members, cl=match.call())
 }
 
+# TODO: Implement, but not so crucial: just avoid unnecessary grouping
 degroup <-  function(sq, group, ...) {
-  trf(sq, 'interlock', cl=match.call())
+  trf(sq, 'interlock', group=group, cl=match.call())
 }
 
-# TODO: Possible to convert communities to groups?
-
+# TODO: Implement function to identify group contents
+# UseMethod getGroup()
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 interlock <- function(ang, ...) {
+  
+  group <- list(...)$group
+  members <- list(...)$members
   
   # Select attributes presented by member argument  
   
   # If members found create group vertex (sphere symbol or {name})
   
   # Recreate member node edges connected to group vertex
+  ang <- add_attributes(ang, group, atype='agroup')
   
-  # Delete member edges
-  
+  # Delete obselete vertices and edges
+  ang <- delete.vertices(ang, match(members, V(ang)$name))
+
   ang
 }
 
@@ -890,7 +930,7 @@ interlock <- function(ang, ...) {
 # Explore available themes
 browseThemes <- function(sq, plot=TRUE) {
   
-  themes <- c('expressive','minimalist')
+  themes <- get_plopt()
   
   # Plot or list themes
   if (plot) {
@@ -921,6 +961,24 @@ echo <- function(ang, ...) {
 # Get current design template
 getTheme <- function(sq, ...) {
   tail(sq, 1)[[1]]$theme
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+get_plopt <- function(theme=NA) {
+
+  if (is.na(theme)) {
+    c('expressive', 'minimalist')
+  } else {
+    
+    # TODO: Attribute color?
+    vc <- switch(theme, minimalist='lightgrey', 'orange1')
+    vcc <- switch(theme, minimalist='grey', 'red')
+    plopt <- list(vertex_color=vc, vertex_contrast_color=vcc)
+
+#    plopt <- c(plopt, vertex_contrast_color=vcc)
+    plopt
+  } 
 }
 
 ################################################################################
@@ -1033,9 +1091,10 @@ signoff <- function(sq, ...) {
   trf(sq, 'notseparateness', cl=match.call())
 }
 
-# Conclude the sequnce
+# Conclude the sequence
 notseparateness <- function(ang, ...) {
   
+  # TODO: Implement required functionality
   cat('Some summary info about the sequence...', '\n\n')
   
   cat('Packaging the data and the code...', '\n\n')

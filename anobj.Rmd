@@ -1,18 +1,25 @@
 ---
 title: "anobj"
-output: html_document
+output: 
+  html_document: 
+    fig_height: 8
+    fig_width: 10
+    highlight: tango
 ---
 Progression of the analysis has a certain structure. This stucture might contain trees, circles, loops, etc. Herein we limit the structure to a simple sequence
 
 ## Observations
 
 ```{r message=FALSE}
+library(ggplot2)
+
 # Common functions
 source('func.R')
 
+# TODO: Generate data based on analysis object definition?
 # Input data
 library(readxl)
-anobs <- read_excel('../data/anobj.xlsx')
+anobs <- read_excel('../../References/data/anobj.xlsx')
 
 # Structure of sample data
 str(anobs)
@@ -27,7 +34,7 @@ Something about the context
 
 ```{r}
 # Initialize the analysis sequence
-anobj <- newsq('Analysis object', 'anobs')
+anobj <- analysis('Analysis object', 'anobs')
 
 # Generate the structure
 anobj <- grow(anobj, 'SEQUENCE', depth=2)
@@ -46,11 +53,13 @@ Something about detailed view
 ```{r}
 # Rearrange the structure
 anobj <- grow(anobj, 'GRAPH', depth=2, attrs=T, vals=T)
-anobj <- void(anobj, c('REPORT','SEQUENCE','STORAGE'))
 
-# Add relevant details
-anobj <- applySizing(anobj)
-anobj <- applySeed(sq=anobj, seed=747)
+# TODO: Workaround till attribute to link conversion done
+anobj <- void(sq=anobj, centers=c("GRAPH>vidx", "GRAPH>eidx"))
+
+# anobj <- void(anobj, c('REPORT','SEQUENCE','STORAGE'))
+anobj <- void(anobj, c('REPORT','STORAGE'))
+anobj <- applySeed(sq=anobj, seed=28)
 anobj
 
 # anobj <- applyAlternation(anobj)
@@ -67,10 +76,71 @@ To illustrate the timeline
 
 ```
 
-## Analysis object overview
+## Analysis object demos
 
 ```{r}
-anobj <- applyTheme(anobj, 'minimalist')
-anobj
+#anobj <- applyTheme(anobj, 'minimalist')
+#anobj
+
+void(anobj, c('OBSERVATION','SEQUENCE'))
+
+# Grouping demo
+ganobj <- applySeed(anobj, 387)
+gmbr <- c('GRAPH>seed', 'GRAPH>theme', 'GRAPH>layout')
+ganobj <- group(ganobj, 'GRAPH>mandatory', gmbr)
+
+gmbr <- c('GRAPH>partitioning', 'GRAPH>alternation', 'GRAPH>vsizing', 'GRAPH>esizing', 'GRAPH>simplicity')
+ganobj <- group(ganobj, 'GRAPH>optional', gmbr)
+
+gmbr <- c('GRAPH>scaling', 'GRAPH>symmetry', 'GRAPH>gradient')
+gname <- 'GRAPH>polishing'
+group(ganobj, gname, gmbr)
+
+sanobj <- applySeed(anobj, 453)
+sanobj <- doScaling(sq=sanobj, scaling=3)
+sanobj
+
+# Add relevant details
+sizobj <- applySeed(anobj, 750)
+sizobj <- applySizing(sizobj)
+sizobj
+
+# Highlighting demo
+hlobj <- applySeed(anobj, 473)
+hlobj <- applyHighlight(hlobj, c('GRAPH','SEQUENCE'))
+hlobj
+
+# Finalise the sequence
+# signoff(anobj)
+```
+
+# Dynamics
+```{r}
+set.seed(3)
+
+n <- 9
+steps <- 1:n
+
+asm <- unlist(lapply(steps, function(x) {
+  rep(x, x + 1 + abs(rnorm(1, 0, 2)))
+}))
+df <- data.frame(cbind(type=rep('assembly', length(asm)), count=asm))
+
+dif <- unlist(lapply(steps, function(x) {
+  rep(x,  n * (n - x+ abs(rnorm(1, 0, 2))))
+}))
+df <- rbind(df, cbind(type=rep('differentiation', length(dif)), count=dif))
+
+p <- ggplot(df, aes(x=count, fill=type))
+p <- p + stat_count(width=0.5, position='dodge')
+p <- p + theme(legend.position=c(1,1), legend.justification=c(1.1,1))
+p <- p + labs(x='Steps', y='Number of Centers')
+p <- p + geom_vline(aes(xintercept=0.5), color='darkblue', linetype='dotted', size=1)
+p <- p + geom_text(aes(x=0.5, label='baseline', y=100), hjust = -0.1, color='darkblue')
+p <- p + geom_vline(aes(xintercept=3.5), color='darkblue', linetype='dotted', size=1)
+p <- p + geom_text(aes(x=3.5, label='checkpoint 1', y=100), hjust = -0.1, color='darkblue')
+p <- p + geom_vline(aes(xintercept=5.5, label='ckpt2'), color='darkblue', linetype='dotted', size=1)
+p <- p + geom_text(aes(x=5.5, label='checkpoint 2', y=100), hjust = -0.1, color='darkblue')
+p
 ```
 
