@@ -18,8 +18,8 @@ source('func.R')
 
 # TODO: Generate data based on analysis object definition?
 # Input data
-library(readxl)
-anobs <- read_excel('../../References/data/anobj.xlsx')
+suppressWarnings(library(readxl))
+anobs <- read_excel('../data/anobj.xlsx')
 
 # Structure of sample data
 str(anobs)
@@ -59,7 +59,7 @@ anobj <- void(sq=anobj, centers=c("GRAPH>vidx", "GRAPH>eidx"))
 
 # anobj <- void(anobj, c('REPORT','SEQUENCE','STORAGE'))
 anobj <- void(anobj, c('REPORT','STORAGE'))
-anobj <- applySeed(sq=anobj, seed=28)
+anobj <- applySeed(sq=anobj, seed=99)
 anobj
 
 # anobj <- applyAlternation(anobj)
@@ -85,7 +85,7 @@ To illustrate the timeline
 void(anobj, c('OBSERVATION','SEQUENCE'))
 
 # Grouping demo
-ganobj <- applySeed(anobj, 387)
+ganobj <- applySeed(anobj, 297)
 gmbr <- c('GRAPH>seed', 'GRAPH>theme', 'GRAPH>layout')
 ganobj <- group(ganobj, 'GRAPH>mandatory', gmbr)
 
@@ -94,21 +94,24 @@ ganobj <- group(ganobj, 'GRAPH>optional', gmbr)
 
 gmbr <- c('GRAPH>scaling', 'GRAPH>symmetry', 'GRAPH>gradient')
 gname <- 'GRAPH>polishing'
-group(ganobj, gname, gmbr)
+ganobj <- group(ganobj, gname, gmbr)
+ganobj
 
-sanobj <- applySeed(anobj, 453)
+sanobj <- applySeed(anobj, 678)
 sanobj <- doScaling(sq=sanobj, scaling=3)
 sanobj
 
 # Add relevant details
-sizobj <- applySeed(anobj, 750)
-sizobj <- applySizing(sizobj)
+sizobj <- applySeed(anobj, 166)
+sizobj <- applySizing(sizobj, method='wt')
 sizobj
 
 # Highlighting demo
 hlobj <- applySeed(anobj, 473)
 hlobj <- applyHighlight(hlobj, c('GRAPH','SEQUENCE'))
 hlobj
+
+applyLayout(sq=anobj, layout="layout_on_grid")
 
 # Finalise the sequence
 # signoff(anobj)

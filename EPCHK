@@ -230,7 +230,7 @@ GET.DATA.SUMMARY:
         NEXT fld_idx
     NEXT rec_idx
 
-* TODO: volrec and voldattr seem to fit into one vol column
+* TODO: volrec and volattr seem to fit into one vol column?
 
 * Field averages
     volrec = 0 ; fillrec = 0

@@ -6,49 +6,63 @@ output:
 ---
 This is the analysis of loan scheduling mechanisms
 
+Big questions: 
+-what is connected to what?
+-How relavant values change over time?
+-What causes values to change?
+
 ## Context
-
-```{r message=FALSE}
-# Analysis functions
-source('func.R')
-
-# Initialise the analysis sequence
-lsobs <- read.csv('../data/t24mb.csv', stringsAsFactors=FALSE, na.strings='')
-lsov <- newsq('Loan scheduling overview', 'lsobs')
-
-# Initial center candidates
-initList <- c('LD.LOANS.AND.DEPOSITS', 'AA.ARRANGEMENT')
-lsov <- grow(lsov, initList, ckpt='baseline')
-applyLayout(lsov, layout='layout_components')
-```
 
 There are too many edges shown and most of them are not particularly useful in this context. Remove these and replace with connections based on record scan
 
 Two clusters linked with CUSTOMER
 
+```{r message=FALSE}
+# Common functions
+source('func.R')
+
+# Initialise the analysis sequence
+lsobs <- read.csv('../data/t24mb.csv', stringsAsFactors=FALSE, na.strings='')
+lsov <- analysis('Loan scheduling overview', 'lsobs')
+
+# Initial center candidates
+initList <- c('LD.LOANS.AND.DEPOSITS', 'AA.ARRANGEMENT')
+lsov <- grow(lsov, initList, ckpt='baseline')
+lsov <- applyLayout(lsov, layout='layout_components')
+lsov
+
+# Remove irrelevant centers
+voidList <- getCenters(lsov)$name
+baseList <- c(initList, 'CUSTOMER')
+# baseList <- c(keepList, 'AA.PRODUCT','AA.PROPERTY','AA.ARRANGEMENT.ACTIVITY')
+lsov <- void(lsov, voidList[!voidList %in% baseList])
+lsov
+
+# aaList <- c('AA.PRODUCT','AA.PROPERTY','AA.ARRANGEMENT.ACTIVITY')
+# lsov <- grow(lsov, aaList, depth=0)
+
+# Keep track of each module separately
+lsov <- applyPartitioning(lsov, 'mbrp')
+lsov
+```
+
+## Value date
+
 Add scanned links and divide into two parallel sequences by module
 
 ```{r}
-# Remove irrelevant centers
-voidList <- getCenters(lsov)$name
-lsov <- void(lsov, voidList[!voidList %in% c(initList, 'CUSTOMER')])
-lsov
 
-# Separate analysis branch for AA
-aasch <- void(lsov, 'LD.LOANS.AND.DEPOSITS', name='AA analysis')
+# aasch <- void(lsov, 'LD.LOANS.AND.DEPOSITS', name='AA analysis')
 
-aaList <- c('AA.PRODUCT','AA.PROPERTY','AA.ARRANGEMENT.ACTIVITY')
-aasch <- grow(aasch, aaList, depth=0)
-
-aasch <- grow(aasch, 'AA.ARRANGEMENT', depth=0, attrs=TRUE)
-applySeed(aasch, 390)
+# lsov <- grow(lsov, 'AA.ARRANGEMENT', depth=0, attrs=TRUE)
+# applySeed(aasch, 390)
 
 # Separate analysis branch for LD
-ldsch <- void(lsov, 'AA.ARRANGEMENT', name='LD analysis')
-ldsch <- grow(ldsch, 'LD.LOANS.AND.DEPOSITS', depth=0, attrs=TRUE)
+# ldsch <- void(lsov, 'AA.ARRANGEMENT', name='LD analysis')
+# lsov <- grow(lsov, 'LD.LOANS.AND.DEPOSITS', depth=0, attrs=TRUE)
 
 # TODO: Remove irrelevant attributes
-applyAlternation(ldsch)
+applyAlternation(lsov)
 ```
 
 ### AA module exloratory analysis
@@ -75,34 +89,37 @@ Linked to AA.ARRANGEMENT
 [17] "EB.EXTERNAL.USER"      
 
 
-## Value date
-
 Add scanned LD links
 
 ```{r}
 
 # Add scanned LD links
-ldsch <- grow(ldsch, c('LD.LOANS.AND.DEPOSITS'), ckpt='valdate')
-ldsch <- grow(ldsch, c('STMT.ENTRY'), ckpt='baseline')
+lsov <- grow(lsov, c('LD.LOANS.AND.DEPOSITS'), ckpt='valdate')
+lsov <- grow(lsov, c('STMT.ENTRY'), ckpt='baseline')
 
 # After checking source tables remove irrelevant entities
-keepList <- c('LD.LOANS.AND.DEPOSITS', 'LD.SCHEDULE.DEFINE',
+valList <- c(baseList, 'LD.LOANS.AND.DEPOSITS', 'LD.SCHEDULE.DEFINE',
   'STMT.ENTRY', 'CUSTOMER', 'ACCOUNT')
-ldsch <- void(ldsch, !(getCenters(ldsch)$name %in% keepList))
-ldsch
+lsov <- void(lsov, !(getCenters(lsov)$name %in% valList))
+lsov
+
+
 ```
 
 Add scanned AA links
+
+# TODO: Determine why AA disbursement FT was not detected by scanning
+
 ```{r}
-keepList <- getCenters(aasch, ctype='entity')$name
+keepList <- getCenters(lsov, ctype='entity')$name
 
-aasch <- grow(aasch, 'AA.ARRANGEMENT', ckpt='valdate')
-applyAlternation(aasch)
+lsov <- grow(lsov, 'AA.ARRANGEMENT', ckpt='valdate')
+# applyAlternation(aasch)
 
-aaVdateList <- c('ACCOUNT', 'STMT.ENTRY',
-  'AA.ARR.ACCOUNT', 'AA.ARR.PAYMENT.SCHEDULE', 'AA.SCHEDULED.ACTIVITY')
-aasch <- void(aasch, !(getCenters(aasch)$name %in% c(keepList,aaVdateList)))
-aasch
+valList <- c(keepList, 'ACCOUNT', 'STMT.ENTRY', 'FUNDS.TRANSFER', 'AA.ARR.ACCOUNT')
+valList <- c(valList, 'AA.ARR.PAYMENT.SCHEDULE', 'AA.SCHEDULED.ACTIVITY')
+lsov <- void(lsov, !(getCenters(lsov)$name %in% valList))
+lsov
 ```
 
 ## Repayment date
@@ -113,17 +130,51 @@ Paid back Good Customer
 
 Rescan after COB?
 
+```{r}
+# Separate analysis for good and bad loans
+lsovg <- applySeed(lsov, 1)
+lsovb <- applySeed(lsov, 101)
+```
 ## Maturity date
 
 EB.CONTRACT.BALANCES?
 
 ```{r}
+# Separate analysis for good and bad loans
+lsovg <- applySeed(lsovg, 2)
+lsovb <- applySeed(lsovb, 102)
+```
 
+## Overdue repayment
+
+```{r}
+lsovb <- applySeed(lsovb, 103)
 ```
 
 ## Archival
 
 Value tracking.... Statuses, balances?
 
+```{r}
+# Separate analysis for good and bad loans
+lsovg <- applySeed(lsovg, 4)
+lsovb <- applySeed(lsovb, 104)
+```
+
+## Conclusions
+
 What can we conclude based on analysis (or in word only?)
+
+```{r}
+# Good loan sequence overview summary
+sqmain <- c('baseline', 'value date', 'repayment date', 'maturity date')
+sqmain2 <- c(sqmain, 'archival date')
+plot(lsovg, main=sqmain2, steps=c(5,10,11,12,13), ncol=3)
+
+# Bad loan sequence overview summary
+sqmain <- c('baseline', 'value date', 'repayment date', 'maturity date')
+sqmain2 <- c(sqmain, 'overdue repayment date', 'archival date')
+plot(lsovb, main=sqmain2, steps=c(5,10,11,12,13,14), ncol=3)
+
+```
 

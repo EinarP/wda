@@ -11,6 +11,25 @@ output:
 suppressWarnings(library(readxl))
 t24obs <- read_excel('../data/t24.xlsx')
 
+# TODO: Remove after fixing source data
+for (idx in 1:nrow(t24obs)) {
+  
+  if (t24obs[idx,'property']=='wt_numattr') {
+    numattr <- as.integer(t24obs[idx,'value'])
+  }
+
+  if (t24obs[idx,'property']=='wt_fillrec') {
+    fillrec <- as.integer(t24obs[idx,'value'])
+    if (fillrec==0) {
+      t24obs[idx,'value'] <- NA
+    } else {
+      if (numattr > 0) {
+        t24obs[idx,'value'] <- as.integer(t24obs[idx,'value'])/numattr
+      }
+    }
+  }
+}
+
 # Observations data frame structure
 str(t24obs, strict.width='cut', width=70)
 
@@ -69,29 +88,30 @@ with(obsw, {
   text(4, 800, paste('Total number of records:', sum(wt_numrec, na.rm=TRUE)))
   
   pmain <- 'Number of Attributes'
-  pxlab <- 'attributes per record [wt_numattr)]'
+  pxlab <- 'attributes per record [wt_numattr]'
   hist(wt_numattr, breaks=20, main=pmain, xlab=pxlab, ylab=pylab)
-  text(150, 500, paste('Mean number of attributes:', round(mean(wt_numattr, na.rm=TRUE))))
+  text(120, 450, paste('Mean number of attributes:', round(mean(wt_numattr, na.rm=TRUE))))
 })
 
 # Sizing plot
 cb <- c(0, 20, 50, 100, 500, seq(1000, 7000, by=1000))
-wt_volrec <- obsw[!is.na(obsw$wt_volrec), 'wt_volrec']
-vr <- cut(wt_volrec, breaks=cb, include.lowest=TRUE)
+volrec <- obsw[!is.na(obsw$wt_volrec), c('wt_volrec','wt_numrec')]
+vr <- cut(volrec$wt_volrec, breaks=cb, include.lowest=TRUE)
 vr <- table(vr)/length(vr)*100
 
 wt_volattr <- obsw[!is.na(obsw$wt_volattr), 'wt_volattr']
 va <- cut(wt_volattr, breaks=cb, include.lowest=TRUE)
 va <- table(va)/length(va)*100
 
-pxlab <- 'item size (bytes)'
+pxlab <- 'item size (bytes) [wt_volrec; wt_volattr]'
 pylab <- 'percent of items'
 pleg <- c('records','attributes')
 barplot(rbind(vr, va), beside=TRUE, main='Sizes', xlab=pxlab, ylab=pylab, legend=pleg)
-text(20, 50, paste('Total size (MB):', round(sum(wt_volattr)/1024)))
+totsize <- round(sum(volrec$wt_volrec*volrec$wt_numrec)/1024/1024)
+text(20, 50, paste('Total data size:', totsize, 'MB'))
 
 # Prepare data for fill plot
-wt_fillrec <- obsw[!is.na(obsw$wt_fillrec), 'wt_fillrec']
+wt_fillrec <- obsw[!is.na(obsw$wt_fillrec), 'wt_fillrec']*100
 fr <- cut(wt_fillrec, breaks=seq(0, 100, by=10), include.lowest=TRUE)
 fr <- table(fr)/length(fr)*100
 
@@ -99,10 +119,12 @@ wt_fillattr <- obsw[!is.na(obsw$wt_fillattr), 'wt_fillattr']*100
 fa <- cut(wt_fillattr, breaks=seq(0, 100, by=10), include.lowest=TRUE)
 fa <- table(fa)/length(fa)*100
 
-pxlab <- 'completeness percentage'
+pxlab <- 'completeness percentage [wt_fillrec; wt_fillattr]'
 barplot(rbind(fr, fa), beside=TRUE, main='Completeness', xlab=pxlab, ylab=pylab, legend=pleg)
-text(18, 50, paste('Mean record completeness (%):', round(mean(wt_fillrec, na.rm=TRUE))))
-text(18, 40, paste('Mean attribute completeness (%):', round(mean(wt_fillattr, na.rm=TRUE))))
+
+# TODO: Shouldn't total record and attribute completenes match?
+# text(18, 50, paste('Mean record completeness (%):', round(mean(wt_fillrec, na.rm=TRUE))))
+text(18, 30, paste0('Mean completeness: ', round(mean(wt_fillattr, na.rm=TRUE)), '%'))
 
 mtext("Summary of Live Data Observations", outer=TRUE, cex=1.3)
 ```
