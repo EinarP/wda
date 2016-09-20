@@ -1,4 +1,6 @@
 
+# TODO: Rename to atrf.r and split into smaller files
+
 library(igraph, quietly=TRUE)
 
 ################################################################################
@@ -136,11 +138,15 @@ apply_checkpoint <- function(ang) {
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Return a summary table
-summary.trsq <- function(sq, all=FALSE) {
+summary.trsq <- function(sq, all=FALSE, plot=FALSE) {
 
   # Convert sequence list to a data frame
   sumrows <- lapply(sq, function(ang) data.frame(get.graph.attribute(ang)))
   sumall <- Reduce(function(...) merge(..., all=TRUE), sumrows)
+  
+  # Graphical summary
+  
+  # par(mfrow=c(2,2), cex.lab=1, mar=c(4,1,1,1))
   
   # Return all or selection of columns
   if (all) {
@@ -157,36 +163,63 @@ summary.trsq <- function(sq, all=FALSE) {
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# TODO: Limit sequence output to 80 columns (long trans truncated with ...)
-# TODO: Limit axis labels to one line
-
 # Sequence overview printing
 print.trsq <- function(sq, ...) {
 
-  ang <- tail(sq, 1)[[1]]
+  ang <<- tail(sq, 1)[[1]]
 
   # Textual output
-  curxlab <- ang$transformation[1]
   cat(ang$name, '\n\n')
-  # print(cbind(id=format(sqtail$id, "%R"), sqtail[ ,2:3]), row.names=FALSE)
   print(tail(summary(sq), 3))
-  par(mfrow = c(1,1), cex.lab=0.8)
-
+  
+  # TODO: Output relevant global options?
+  
   # Graphical output
   if (vcount(ang) > 0) {
-    plot.trsq(sq, title=curxlab)
+    par(mfrow = c(1,1), cex.lab=0.8)
+
+    # TODO: Limit sequence label to 80 chars (long labels truncated with ...)
+    xlab <- paste0(length(sq), ': ', ang$transformation[1])
+    plot_ang(ang, title=xlab)
   }
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# TODO: Perhaps by using qgraph instead of igraph)
+# Plot the analysis sequence
+plot.trsq <- function(sq, title='plot1', steps=NULL) {
+  if (is.null(steps)) {
+    plot_ang(tail(sq, 1)[[1]], title)
+  } else {
+    # TODO: Reuse multiplot
+    nrows <- 2 ; ncols <- 2
+    par(mfrow=c(nrows,ncols), cex.lab=1, mar=c(4,1,1,1))
+    
+    trfs <- summary(sov)$transformation
+    
+    curseq <- NA
+    steps_idx <- startstep <- 1
+    for (curstep in 1:steps[length(steps)]) {
+      
+      curtrf <- sub('\\(.*$', '', trfs[curstep])
+      if (is.na(curseq)) curseq <- curtrf else curseq <- c(curseq, curtrf)
+      
+      if (curstep==steps[steps_idx]) {
+        ptitle <- paste0('[', startstep, '-', curstep, ']')
+        ptitle <- paste(ptitle, paste(curseq, collapse='>'))
+        plot_ang(sq[[curstep]], ptitle)
+        startstep <- curstep + 1
+        steps_idx <- steps_idx + 1
+        curseq <- NA
+      }
+    }
+      
+  }
+}
 
-# Output last graph of the sequence
-plot.trsq <- function(sq, title='plot1') {
+# Plot the analysis graph
+plot_ang <- function(ang, title='plot1') {
   
-  ang <- tail(sq, 1)[[1]]
-
   # Set random number generator
   set.seed(ang$seed)
   
@@ -197,21 +230,32 @@ plot.trsq <- function(sq, title='plot1') {
     layout <- do.call(ang$layout, list(ang))
   }
 
-  # Determine plotting options  
+  # Apply plotting options  
   plopt <- list(xlab=title)
   thmopt <- get_plopt(ang$theme)
+
+  V(ang)[V(ang)$type=='entity']$shape <- 'square'
+  V(ang)[V(ang)$type=='egroup']$shape <- 'fsquare'
+  V(ang)[V(ang)$type=='attribute']$shape <- 'circle'
+  V(ang)[V(ang)$type=='agroup']$shape <- 'fcircle' 
   
   V(ang)$color <- thmopt$vertex_color
-  V(ang)[V(ang)$contrast]$color <- thmopt$vertex_contrast_color
+  
+  # TODO: Commented out for membership grouping
+#  V(ang)[V(ang)$contrast]$color <- thmopt$vertex_contrast_color
 
+  V(ang)$frame.color <- thmopt$vertex_frame_color
+  V(ang)[!V(ang)$type %in% c('egroup','agroup')]$frame.color <- NA
+  V(ang)$frame.width <- thmopt$vertex_frame_width
+    
   # Simplified/full presentation
   # Non-essential sans names? etc in the background
   if (ang$simplicity) {
     plopt <- c(plopt, edge.arrow.mode=0, vertex.label.cex=0.8)
     
-    if (length(V(ang)) > 7) {
+    if (length(V(ang)) > 20) {
       # Set big enough criteria to sevent largest value
-      bigenough <- V(ang)[order(V(ang)$size, decreasing=TRUE)[7]]$size
+      bigenough <- V(ang)[order(V(ang)$size, decreasing=TRUE)[20]]$size
       for(idx in seq_along(V(ang))) {
         if (V(ang)[idx]$size < bigenough) {
           V(ang)[idx]$label <- NA
@@ -244,7 +288,7 @@ plot.trsq <- function(sq, title='plot1') {
   }
   
   plopt <- c(plopt, layout=list(layout), 
-    vertex.frame.color=NA, vertex.label.family='sans', edge.arrow.size=0.2,
+    vertex.label.family='sans', edge.label.family='sans', edge.arrow.size=0.2,
     edge.label.cex=0.8, edge.curved=list(0.3*which_mutual(ang)))
   
   # TODO: cluster coloring
@@ -253,6 +297,19 @@ plot.trsq <- function(sq, title='plot1') {
   
   # Apply partitioning
   anp <- ang$partitioning
+  
+  # Adjust element sizes
+  if (is.na(ang$sizing)) {
+    V(ang)$size <- thmopt$vertex_size
+  } else {
+    sfactor <- thmopt$vertex_size * 3
+    maxsize <- max(V(ang)$size)
+    if (maxsize > 100) {
+      V(ang)$size <- log1p(V(ang)$size)
+      maxsize <- max(V(ang)$size)
+    }
+    V(ang)$size <- round(V(ang)$size/maxsize * sfactor)
+  }
   
   # Output a graph or a graph with community
   if (is.na(anp) | ang$simplicity) {
@@ -355,9 +412,9 @@ add_entities <- function(center, depth, attrs, vals) {
   # Add entity if not present
   if (!is.element(center, V(tmpang)$name)) {
 
-    # TODO: Separate meaning from presentation (shape and size)    
+    # TODO: Separate meaning from presentation (size)    
     eattr <- list(name=center, label=center, type='entity', contrast=FALSE)
-    eattr <- c(eattr, shape='square', size=15)
+    eattr <- c(eattr, size=15)
     tmpang <<- add_vertices(tmpang, 1, attr=eattr)
   }
   
@@ -388,9 +445,6 @@ add_entities <- function(center, depth, attrs, vals) {
 # Add attribute elements
 add_attributes <- function(ang, centers, vals=FALSE, atype='attribute') {
   
-  # TODO: Shape selection should be part of theme
-  ashape <- ifelse(atype=='attribute', 'circle', 'raster')
-  
   # Temporary global graph
   tmpang <<- ang
   
@@ -415,7 +469,7 @@ add_attributes <- function(ang, centers, vals=FALSE, atype='attribute') {
         newlabel <- unname(cattr['objattr'])
         if (!newattr %in% V(ang)$name) {
           aattr <- list(name=newattr, label=newlabel)
-          aattr <- c(aattr, shape=ashape, type=atype, size=5, contrast=FALSE)
+          aattr <- c(aattr, type=atype, size=5, contrast=FALSE)
           ang <<- add_vertices(tmpang, 1, attr=aattr)
           tmpang <<- add_link(ang, cattr['objsrc'], newattr, etype='association')
         }
@@ -717,16 +771,18 @@ browseSizings <- function(sq) {
 }
 
 # User friendly transformation function call
-applySizing <- function(sq, method=NULL) {
-  trf(sq, 'space', method=method, cl=match.call())
+applySizing <- function(sq, method) {
+  if (existsFunction(method)) {
+    trf(sq, 'sizing_trf', sizing=method, cl=match.call())
+  } else {
+    trf(sq, 'sizing_pregiven', sizing=method, cl=match.call())
+  }
 }
 
-space <- function(ang, ...) {
+sizing_trf <- function(ang, ...) {
 
-  aargs <- list(...)
-  method <- ifelse(is.null(aargs$method), 'wt', aargs$method)
-  
-  if (existsFunction(method)) {
+  method <- ang$sizing
+
     # Calculate sizes
     #  V(ang)$size <- sample(10:20, length(V(ang)), replace=TRUE)
     
@@ -740,25 +796,24 @@ space <- function(ang, ...) {
     
     E(ang)$width <- sample(1:5, length(E(ang)), replace=TRUE)
     E(ang)$arrow.size <- E(ang)$width^2
-  } else {
-    ang <- space_pregiven(ang, method)
-  }
 
 # Limit the range and maximum size
-  maxsize <- max(V(ang)$size)
-  if (maxsize > 35) {
-    for (idx in seq_along(V(ang))) {
-      if (V(ang)[idx]$size > 0) {
-        V(ang)[idx]$size <- round(3 + 30*V(ang)[idx]$size/maxsize)
-      }
-    }
-  }
+#  maxsize <- max(V(ang)$size)
+#  if (maxsize > 35) {
+#    for (idx in seq_along(V(ang))) {
+#      if (V(ang)[idx]$size > 0) {
+#        V(ang)[idx]$size <- round(3 + 30*V(ang)[idx]$size/maxsize)
+#      }
+#    }
+#  }
   
   ang
 }
 
 # Apply pregiven sizes
-space_pregiven <- function(ang, method) {
+sizing_pregiven <- function(ang, ...) {
+  
+  method <- ang$sizing
   
   obs <- browseData(ang)
   sizing <- obs[!is.na(obs[ ,method]), ]
@@ -884,44 +939,143 @@ contrast <- function(ang, ...) {
 }
 
 ################################################################################
-# INTERLOCK transformations
+# INTERLOCK transformations: Combine the elements
 ################################################################################
 
-# Can be useful for handling repeating blocks like audit fields
-# TODO: Group by community parameter
-# TODO: Group by community parameter 
+# TODO: Implement function to browse group contents
 
-# User friendly transformation function call
-group <- function(sq, group, members, ...) {
-  trf(sq, 'interlock', group=group, members=members, cl=match.call())
-}
-
-# TODO: Implement, but not so crucial: just avoid unnecessary grouping
-degroup <-  function(sq, group, ...) {
-  trf(sq, 'interlock', group=group, cl=match.call())
-}
-
-# TODO: Implement function to identify group contents
-# UseMethod getGroup()
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-interlock <- function(ang, ...) {
+# User friendly grouping transformation function calls
+group <- function(sq, group=NULL, members=NULL, ...) {
+  if (is.null(group[1]) & is.null(members[1])) {
+    trf(sq, 'group_communities', cl=match.call())
+  } else {
+    trf(sq, 'group_trf', group=group, members=members, cl=match.call())
+  } 
+}
+
+# Group entities by community membership 
+group_communities <- function(ang, ...) {
+  
+  ang <- contract(ang, as.factor(V(ang)$membership), vertex.attr.comb=toString)
+  
+  V(ang)$type <- 'egroup'
+  V(ang)$group <- V(ang)$name
+  V(ang)$membership <- gsub(',.*$', '', V(ang)$membership)
+  V(ang)$name <- V(ang)$membership
+  V(ang)$label <- V(ang)$membership
+  V(ang)$contrast <- FALSE
+  
+  sumsz <- sapply(V(ang)$size, function(x) {
+    sum(as.numeric(unlist(strsplit(gsub(' ', '', x), ','))))
+  })
+  ang <- delete_vertex_attr(ang, 'size')
+  V(ang)$size <- sumsz
+  
+  # TODO: maintain edge attributes like labels
+  ang <- simplify(ang, remove.loops=T)
+
+  ang
+}
+
+group_trf <- function(ang, ...) {
   
   group <- list(...)$group
   members <- list(...)$members
   
-  # Select attributes presented by member argument  
+  if (grepl('>', members[1])) {
+
+    # TODO: Implement attribute grouping properly
+    ang <- add_attributes(ang, group, atype='agroup')
+    ang <- delete.vertices(ang, match(members, V(ang)$name))
+  } else {
+    
+    # TODO: Implement entity grouping
+  } 
   
-  # If members found create group vertex (sphere symbol or {name})
+  ang
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# User friendly degrouping transformation function calls
+degroup <- function(sq, group, ...) {
+  trf(sq, 'degroup_trf', group=group, members=NA, cl=match.call())
+}
+
+# TODO: Implement, but not so crucial: just avoid unnecessary grouping
+degroup_trf <- function(ang, ...) {
   
-  # Recreate member node edges connected to group vertex
-  ang <- add_attributes(ang, group, atype='agroup')
-  
-  # Delete obselete vertices and edges
-  ang <- delete.vertices(ang, match(members, V(ang)$name))
+  group <- list(...)$group
 
   ang
 }
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# Group symbols
+# http://lists.gnu.org/archive/html/igraph-help/2013-03/msg00030.html
+
+# TODO: Use function generator
+
+fcircle <- function(coords, v=NULL, params) {
+    vertex.color <- params("vertex", "color")
+    if (length(vertex.color) != 1 && !is.null(v)) {
+      vertex.color <- vertex.color[v]
+    }
+    vertex.size <- 1/200 * params("vertex", "size")
+    if (length(vertex.size) != 1 && !is.null(v)) {
+      vertex.size <- vertex.size[v]
+    }
+    vertex.frame.color <- params("vertex", "frame.color")
+    if (length(vertex.frame.color) != 1 && !is.null(v)) {
+      vertex.frame.color <- vertex.frame.color[v]
+    }
+    vertex.frame.width <- params("vertex", "frame.width")
+    if (length(vertex.frame.width) != 1 && !is.null(v)) {
+      vertex.frame.width <- vertex.frame.width[v]
+    }
+    
+    mapply(coords[,1], coords[,2], vertex.color, vertex.frame.color,
+           vertex.size, vertex.frame.width,
+           FUN=function(x, y, bg, fg, size, lwd) {
+             symbols(x=x, y=y, bg=bg, fg=fg, lwd=lwd,
+                     circles=size, add=TRUE, inches=FALSE)
+           })
+}
+
+add.vertex.shape('fcircle', clip=igraph.shape.noclip,
+  plot=fcircle, parameters=list(vertex.frame.color=1, vertex.frame.width=1))
+
+fsquare <- function(coords, v=NULL, params) {
+  vertex.color <- params("vertex", "color")
+  if (length(vertex.color) != 1 && !is.null(v)) {
+    vertex.color <- vertex.color[v]
+  }
+  vertex.size <- 1/200 * params("vertex", "size")
+  if (length(vertex.size) != 1 && !is.null(v)) {
+    vertex.size <- vertex.size[v]
+  }
+  vertex.frame.color <- params("vertex", "frame.color")
+  if (length(vertex.frame.color) != 1 && !is.null(v)) {
+    vertex.frame.color <- vertex.frame.color[v]
+  }
+  vertex.frame.width <- params("vertex", "frame.width")
+  if (length(vertex.frame.width) != 1 && !is.null(v)) {
+    vertex.frame.width <- vertex.frame.width[v]
+  }
+  
+  mapply(coords[,1], coords[,2], vertex.color, vertex.frame.color,
+         vertex.size, vertex.frame.width,
+         FUN=function(x, y, bg, fg, size, lwd) {
+           symbols(x=x, y=y, bg=bg, fg=fg, lwd=lwd,
+                   squares=size, add=TRUE, inches=FALSE)
+         })
+}
+
+add.vertex.shape('fsquare', clip=igraph.shape.noclip,
+  plot=fsquare, parameters=list(vertex.frame.color=1, vertex.frame.width=1))
 
 ################################################################################
 # ECHO transformations
@@ -971,10 +1125,22 @@ get_plopt <- function(theme=NA) {
     c('expressive', 'minimalist')
   } else {
     
-    # TODO: Attribute color?
+    # Vertex color
     vc <- switch(theme, minimalist='lightgrey', 'orange1')
     vcc <- switch(theme, minimalist='grey', 'red')
     plopt <- list(vertex_color=vc, vertex_contrast_color=vcc)
+
+    # TODO: Color for minimalist group frame
+    
+    # Vertex frame
+    vfc <- 'lightgrey'
+    vfw <- 5
+    plopt <- c(plopt, vertex_frame_color=vfc, vertex_frame_width=vfw)
+
+    # TODO: Attribute color?
+    
+    # Default element sizes
+    plopt <- c(plopt, vertex_size=15, edge_size=1)
 
 #    plopt <- c(plopt, vertex_contrast_color=vcc)
     plopt
@@ -1033,6 +1199,8 @@ getLayout <- function(sq, ...) {
 ################################################################################
 # SIMPLICITY transformations
 ################################################################################
+
+# TODO: Instead TRUE/FALSE number of displayed labels?
 
 # User-friendly function call for setting simplified presentation mode
 applySimplicity <- function(sq, ...) {

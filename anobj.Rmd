@@ -19,7 +19,7 @@ source('func.R')
 # TODO: Generate data based on analysis object definition?
 # Input data
 library(readxl)
-anobs <- read_excel('../../References/data/anobj.xlsx')
+anobs <- read_excel('../data/anobj.xlsx')
 
 # Structure of sample data
 str(anobs)

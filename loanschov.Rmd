@@ -14,7 +14,7 @@ source('func.R')
 
 # Initialise the analysis sequence
 lsobs <- read.csv('../data/t24mb.csv', stringsAsFactors=FALSE, na.strings='')
-lsov <- newsq('Loan scheduling overview', 'lsobs')
+lsov <- analysis('Loan scheduling overview', 'lsobs')
 
 # Initial center candidates
 initList <- c('LD.LOANS.AND.DEPOSITS', 'AA.ARRANGEMENT')
