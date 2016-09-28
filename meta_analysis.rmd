@@ -17,6 +17,7 @@ library(ggplot2)
 source('func.R')
 
 # TODO: Generate data based on analysis object definition?
+
 # Input data
 suppressWarnings(library(readxl))
 anobs <- read_excel('../data/anobj.xlsx')
