@@ -8,26 +8,38 @@ suppressPackageStartupMessages(library(igraph))
 ################################################################################
 
 # Construct the transformations sequence object
-analysis <- function(name, dataref, ...) {
+analysis <- function(name, datarefl=NULL, datarefw=NULL, ...) {
 
-  obsl <- get(dataref)
+  if (is.null(datarefw)) {
+    if (is.null(datarefl)) {
+      stop('Reference to data must be provided.')
+    } else {
+      obsl <- get(datarefl)
   
-  # Tidy up checkpoints for reshaping
-  if (!is.element('checkpoint', names(obsl))) {
-    obsl$checkpoint <- 'all'
+      # TODO: Separate function for long to wide transfers?
+      
+      # Tidy up checkpoints for reshaping
+      if (!is.element('checkpoint', names(obsl))) {
+        obsl$checkpoint <- 'all'
+      } else {
+        obsl[is.na(obsl$checkpoint),'checkpoint'] <- 'all'
+      }
+    
+      # Convert from long to wide format
+      obsl <- unique(obsl[ ,1:4])
+      obsw <- reshape(obsl, direction='wide',
+                    idvar=c('object','checkpoint'), timevar='property')
+    
+      # Convert weights to numeric
+      wtcol <- grep('wt_', names(obsw))
+      obsw[ ,wtcol] <- apply(obsw[ ,wtcol], 2, as.numeric)
+      
+      datarefw <- paste0(datarefl, 'w')
+    }
   } else {
-    obsl[is.na(obsl$checkpoint),'checkpoint'] <- 'all'
+    obsw <- get(datarefw)
   }
-  
-  # Convert from long to wide format
-  obsl <- unique(obsl[ ,1:4])
-  obsw <- reshape(obsl, direction='wide',
-    idvar=c('object','checkpoint'), timevar='property')
-  
-  # Concert weights to numeric
-  wtcol <- grep('wt_', names(obsw))
-  obsw[ ,wtcol] <- apply(obsw[ ,wtcol], 2, as.numeric)
-  
+
   # Append helper columns
   objsplit <- strsplit(sub('\\|', '>', obsw$object), '>', fixed=TRUE)
   obsw$objsrc <- sapply(objsplit, function(x) x[1])
@@ -37,18 +49,19 @@ analysis <- function(name, dataref, ...) {
   # Tidy up
   names(obsw) <- gsub('value.', '', names(obsw))
   obsw <- obsw[with(obsw, order(object, checkpoint)), ]
-  
-  # Caching of long to wide transformation
-  assign(paste0(dataref,'w'), obsw, envir=.GlobalEnv)
 
+  # Caching of long to wide transformation
+  assign(datarefw, obsw, envir=.GlobalEnv)
+  
   # Empty graph with default settings  
   ang <- set_trsq_attr(graph.empty(), match.call(),
 
     # Generic (sequence or multi-step) metadata
-    name=name, data=dataref, checkpoint=NA, output='plot',
+    name=name, data=datarefw, checkpoint=NA, output='plot',
 
     # Global properties with no default value
-    partitioning=NA, scaling=NA, symmetry=NA, sizing=NA, layout=NA, 
+    partitioning=NA, partitioning2=NA, scaling=NA, symmetry=NA,
+    sizing=NA, sizing2=NA, layout=NA, 
 
     # Global properties with default value
     seed=1, theme='expressive', 
@@ -68,20 +81,19 @@ trf <- function(sq, trans, cl, ...) {
   # Retrieve latest structure with updated attributes
   curang <- set_trsq_attr(tail(sq, 1)[[1]], cl, ...)
 
-  # Remove what does not belong to new checkpoint
-  if (!is.null(list(...)$checkpoint)) {
-# TODO: Redo checkpoint concept    
-  #  curang <- apply_checkpoint(curang)
-  }
-  
   # Call the transformation function
   trfang <- do.call(match.fun(trans), args=list(curang, ...))
-  
-  # Update communities if partitioning present
-  if (!is.na(trfang$partitioning) & trans != 'boundary') {
-    trfang <- boundary(ang=trfang)
+ 
+  # Updates after structural changes
+  if (trans %in% c('center', 'alternation')) {
+    if (!(is.na(trfang$partitioning) & is.na(trfang$partitioning2))) {
+      trfang <- partitioning(trfang)
+    }
+    if (!(is.na(trfang$sizing) & is.na(trfang$sizing2))) {
+      trfang <- sizing(trfang)
+    }
   }
-  
+
   # Expand the structure list
   sq[[length(sq)+1]] <- trfang
    
@@ -251,8 +263,6 @@ plot_ang <- function(ang, xlab=NULL, main=NULL) {
   V(ang)[V(ang)$type=='attribute']$shape <- 'circle'
   V(ang)[V(ang)$type=='agroup']$shape <- 'fcircle' 
   
-  V(ang)$color <- thmopt$vertex_color
-  
   # TODO: Commented out for membership grouping
 #  V(ang)[V(ang)$contrast]$color <- thmopt$vertex_contrast_color
 
@@ -265,8 +275,8 @@ plot_ang <- function(ang, xlab=NULL, main=NULL) {
   if (ang$simplicity) {
     plopt <- c(plopt, edge.arrow.mode=0, vertex.label.cex=0.8)
     
-    # TODO: Dynamic determination of big enough criteria
-    namedsz <- 7
+    # TODO: Dynamic or parameterized determination of big enough criteria
+    namedsz <- 10
     if (length(V(ang)) > namedsz) {
       bigenough <- V(ang)[order(V(ang)$size, decreasing=TRUE)[namedsz]]$size
       for(idx in seq_along(V(ang))) {
@@ -308,9 +318,6 @@ plot_ang <- function(ang, xlab=NULL, main=NULL) {
   # If Simplicity, color notes to represent communities
   # do.call('plot', c(list(anp, ang), plopt, list(col=c("green","blue") )))
   
-  # Apply partitioning
-  anp <- ang$partitioning
-  
   # Adjust element sizes
   if (is.na(ang$sizing)) {
     V(ang)[V(ang)$type=='entity']$size <- thmopt$entity_size
@@ -324,17 +331,31 @@ plot_ang <- function(ang, xlab=NULL, main=NULL) {
       V(ang)$size <- log1p(V(ang)$size)
       maxsize <- max(V(ang)$size)
     }
+    # TODO: vertex_scaling should be adjusted by center count
     V(ang)$size <- round(V(ang)$size/maxsize * thmopt$vertex_scaling)
   }
   
+  # Differentiated communities by entity coloring
+  if (is.na(ang$partitioning2)) {
+    V(ang)$color <- thmopt$vertex_color
+  } else {
+    nc <- length(unique(V(ang)$membership2))
+    V(ang)$color <- rainbow(nc)[as.factor(V(ang)$membership2)]
+  }
+  
   # Output a graph or a graph with community
-  if (is.na(anp) | ang$simplicity) {
+  if (is.na(ang$partitioning) | ang$simplicity) {
       do.call(ang$output, c(list(ang), plopt))
   } else {
     mbrp <- V(ang)$membership
     anp <- make_clusters(ang, as.numeric(factor(mbrp)))
+
+    # Testing
+    #  mark_col <- list(c("tan", "pink", "lightgray", "gray", "green"))
+    #  plopt <- c(plopt, mark.border=NA, mark.col=mark_col)
     
     # TODO: communities in tkplot using color
+    plopt <- c(plopt, col=list(V(ang)$color))
     do.call('plot', c(list(anp, ang), plopt))
   }
 }
@@ -360,36 +381,41 @@ multiplot.trsq <- function(sq, fun, items) {
 ################################################################################
 
 # Explore center candidates
-browseData <- function(sq, all=FALSE) {
+browseData <- function(sq, ckpt=NULL) {
   
   if(class(sq)=='trsq') sq <- tail(sq, 1)[[1]]
   
-  obsw <- get(paste0(sq$data, 'w'))
+  obsw <- get(sq$data)
 
   # Filter based on checkpoint
-  if (!all) {
-    if (is.na(sq$checkpoint)) sq$checkpoint <- 'all'
-    obsw <- subset(obsw, checkpoint==sq$checkpoint)
+  if (is.null(ckpt)) {
+    if (!is.na(sq$checkpoint)) {
+      obsw <- subset(obsw, checkpoint==sq$checkpoint)
+    } 
+  } else {
+    if (ckpt != 'all') {
+      obsw <- subset(obsw, checkpoint==ckpt) 
+    }
   }
   
   obsw
 }
 
-browseEntities <- function(sq) {
-  subset(browseData(sq), is.na(objattr))
+browseEntities <- function(sq, ckpt=NULL) {
+  subset(browseData(sq, ckpt), is.na(objattr))
 }
 
-browseAttributes <- function(sq) {
-  subset(browseData(sq), !is.na(objattr) & is.na(objdest))
+browseAttributes <- function(sq, ckpt=NULL) {
+  subset(browseData(sq, ckpt), !is.na(objattr) & is.na(objdest))
 }
 
 # TODO: Implement function
-browseValues <- function(sq) {
-  browseData(sq)
+browseValues <- function(sq, ckpt=NULL) {
+  browseData(sq, ckpt)
 }
 
-browseRelations <- function(sq) {
-  subset(browseData(sq), !is.na(objdest))
+browseRelations <- function(sq, ckpt=NULL) {
+  subset(browseData(sq, ckpt), !is.na(objdest))
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -611,56 +637,69 @@ browsePartitionings <- function(sq, plot=TRUE, ...) {
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# User friendly transformation function call for partitioning
+# User friendly transformation function calls for partitioning
 applyPartitioning <- function(sq, partitioning) {
-  trf(sq, 'boundary', partitioning=partitioning, cl=match.call())
+  trf(sq, 'partitioning', partitioning=partitioning, cl=match.call())
 }
 
-# User-friendly transformation function call for removing partitioning
+applyPartitioning2 <- function(sq, partitioning) {
+  trf(sq, 'partitioning', partitioning2=partitioning, cl=match.call())
+}
+
+# User-friendly transformation function calls for removing partitioning
 removePartitioning <- function(sq) {
-  trf(sq, 'boundary', partitioning=NA, cl=match.call())
+  trf(sq, 'partitioning', partitioning=NA, cl=match.call())
+}
+
+removePartitioning2 <- function(sq) {
+  trf(sq, 'partitioning', partitioning2=NA, cl=match.call())
 }
 
 # Add boundary
-boundary <- function(ang, ...) {
+partitioning <- function(ang, ...) {
 
-  anp <- ang$partitioning
+  # TODO: Not most efficient to always reapply both
+  V(ang)$membership <- get_communities(ang, ang$partitioning)
+  V(ang)$membership2 <- get_communities(ang, ang$partitioning2)
+
+  ang
+}
+
+get_communities <- function(ang, method) {
   
-  if (is.na(anp)) {
-    
-    # Remove partitioning
-    V(ang)$membership <- NA
+  if (is.na(method)) {
+    comm <- NA
   } else {
-  
-    if (existsFunction(anp)) {
+    if (existsFunction(method)) {
     
       # Apply community detection algorithm
-      comm <- do.call(anp, list(ang))
-      V(ang)$membership <- comm$membership
+      res <- do.call(method, list(ang))
+      comm <- res$membership
     } else {
 
       # Use pregiven communities    
-#       obs <- browseData(ang)
-      obsw <- get(paste0(ang$data, 'w'))
-      comm <- obsw[!is.na(obsw[ ,anp]), c('object',anp)]
+      obsw <- browseData(ang, 'all')
+  #    obsw <- get(ang$data)
+      comm <- obsw[!is.na(obsw[ ,method]), c('object',method)]
       if (nrow(comm)) {
         ents <- sub('>.*', '', V(ang)$name)
-        V(ang)$membership <- comm[match(ents, comm$object), anp]
-        ang <- set_vertex_attr(ang, 
-          'membership', index=is.na(V(ang)$membership), value='ERR')
+        comm <- comm[match(ents, comm$object),method]
       } else {
         stop('No memberships pregiven.')
       }
     }
+    
+    comm[is.na(comm)] <- 'ERR'  
   }
-  ang
+  comm
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Get current partitioning algorithm or source data
-getPartitioning <- function(sq) {
-  tail(sq, 1)[[1]]$partitioning
+getPartitionings <- function(sq) {
+  ang <- tail(sq, 1)[[1]]
+  c(ang$partitioning, ang$partitioning2) 
 }
 
 ################################################################################
@@ -780,22 +819,33 @@ getSymmetry <- function(sq) {
 ################################################################################
 
 # TODO: Implement function
-browseSizings <- function(sq) {
-  
-}
+browseSizings <- function(sq) {}
 
-# User friendly transformation function call
+# User friendly transformation function calls
 applySizing <- function(sq, method) {
+  trf(sq, 'sizing', sizing=method, cl=match.call())
+}  
+
+# TODO: Implement function
+applySizing2 <- function(sq) {}
+
+sizing <- function(ang, ...) {
+  
+  method <- ang$sizing
+  
   if (existsFunction(method)) {
-    trf(sq, 'sizing_trf', sizing=method, cl=match.call())
+    ang <- sizing_fun(ang, method, ...)
   } else {
-    trf(sq, 'sizing_pregiven', sizing=method, cl=match.call())
+    ang <- sizing_pregiven(ang, method, ...)
   }
+  
+  # Avoid crashing because of NA size
+  V(ang)$size[is.na(V(ang)$size)] <- 0
+  
+  ang
 }
 
-sizing_trf <- function(ang, ...) {
-
-  method <- ang$sizing
+sizing_fun <- function(ang, ...) {
 
     # Calculate sizes
     #  V(ang)$size <- sample(10:20, length(V(ang)), replace=TRUE)
@@ -825,11 +875,9 @@ sizing_trf <- function(ang, ...) {
 }
 
 # Apply pregiven sizes
-sizing_pregiven <- function(ang, ...) {
+sizing_pregiven <- function(ang, method, ...) {
   
-  method <- ang$sizing
-  
-  obs <- browseData(ang)
+  obs <- browseData(ang, 'all')
   sizing <- obs[!is.na(obs[ ,method]), ]
 
   for (idx in seq_along(sizing$object)) {
@@ -838,6 +886,7 @@ sizing_pregiven <- function(ang, ...) {
 
     # Resize vertices
     if (is.na(sizing[idx,'objdest'])) {
+      if (length(V(ang)$name==cname) == 0) print(cname)
       ang <- set_vertex_attr(ang, 'size', index=V(ang)$name==cname, value=csize)  
     } else {
       ang <- set_edge_attr(ang, 'width',
@@ -1154,7 +1203,7 @@ get_plopt <- function(theme=NA) {
     # TODO: Attribute color?
     
     # Default element sizes
-    plopt <- c(plopt, vertex_scaling=45, entity_size=15, egroup_size=20)
+    plopt <- c(plopt, vertex_scaling=25, entity_size=15, egroup_size=20)
     plopt <- c(plopt, attribute_size=5, agroup_size=10, edge_size=1)
 #    plopt <- c(plopt, vertex_contrast_color=vcc)
     plopt
@@ -1257,7 +1306,7 @@ thevoid <- function(ang, ...) {
   ang <- delete.vertices(ang, centers)
   
   # Delete attributes
-  obs <- browseData(ang, all=TRUE)
+  obs <- browseData(ang, ckpt='all')
   ang <- delete.vertices(ang, 
     is.element(obs[match(V(ang)$name, obs$object), 'objsrc'], centers))
   

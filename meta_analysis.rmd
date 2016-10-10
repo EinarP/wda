@@ -20,7 +20,7 @@ source('func.R')
 
 # Input data
 suppressWarnings(library(readxl))
-anobs <- read_excel('../data/anobj.xlsx')
+anobs <- read_excel('../data/meta_analysis.xlsx')
 
 # Structure of sample data
 str(anobs)

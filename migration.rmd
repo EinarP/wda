@@ -1,0 +1,93 @@
+---
+title: "Overview"
+output:
+  html_document: default
+  word_document: default
+---
+TODO: List data whenever need
+
+Trying to get an overview of the migration from one system to another
+
+```{r message=FALSE}
+# Load observations
+suppressWarnings(library(readxl))
+mobsw <- read_excel('../data/migration.xlsx')
+
+# Load transformation functions and initiate the sequence
+source('func.R')
+mov <- analysis('Data Migration Overview', datarefw='mobsw')
+```
+
+# Source data identification
+
+Number of records is not an ideal metric, but good enough for rough estimations
+
+```{r}
+# Create a structure comprised of source centers
+entities <- browseEntities(mov, ckpt='baseline')$object
+mov <- grow(mov, entities, ckpt='baseline')
+
+# Change size of the edges to reflect record count
+mov <- applySizing(mov, 'wt_numrec')
+
+# Change color of entities to reflect the dataset
+mov <- applyPartitioning2(mov, 'mbrp_dataset')
+mov
+```
+
+# Static data downloading and pre-processing
+
+TODO: Somehow preprocessing rules should be shown
+
+```{r}
+# Add extracted static entities
+entities <- browseEntities(mov, ckpt='download_static')$object
+mov <- grow(mov, entities, ckpt='download_static')
+
+# Divide into sub-systems
+mov <- applyPartitioning(mov, 'mbrp_system')
+mov
+```
+
+# Static data transformation and uploading
+
+```{r}
+entities <- browseEntities(mov, ckpt='upload_static')$object
+mov <- grow(mov, entities, ckpt='upload_static')
+mov
+
+```
+
+# Financial data downloading and pre-processing
+
+```{r}
+entities <- browseEntities(mov, ckpt='download_financial')$object
+mov <- grow(mov, entities, ckpt='download_financial')
+mov
+
+```
+
+# Financial data transformation and uploading
+
+```{r}
+entities <- browseEntities(mov, ckpt='upload_financial')$object
+mov <- grow(mov, entities, ckpt='upload_financial')
+mov
+
+```
+
+# Reconciliation and summary
+
+```{r}
+entities <- browseEntities(mov, ckpt='reconciliation')$object
+mov <- grow(mov, entities, ckpt='reconciliation')
+
+mov <- applySeed(mov, 376)
+
+#mov <- group(mov)
+mov
+
+sqmain <- c('identification', 'static download', 'static upload')
+sqmain <- c(sqmain, 'financial download', 'financial upload', 'reconciliation')
+plot(mov, main=sqmain, steps=c(4, 6, 7, 8, 9, 11), ncol=3)
+```

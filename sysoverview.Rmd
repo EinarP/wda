@@ -1,0 +1,85 @@
+---
+title: "Overview"
+output:
+  html_document: default
+  word_document: default
+---
+TODO: Meaningful annotations
+
+Trying to get an overview of what is happening in the system
+
+```{r message=FALSE}
+# Load observations
+library(readxl)
+tobs <- read_excel('../data/t24.xlsx')
+
+# Load transformation functions and start the sequence
+source('func.R')
+sov <- analysis('System Overview', 'tobs')
+```
+
+First attempt looks messy:
+
+```{r}
+# Create a structure comprised of all centers
+entities <- browseEntities(sov)$object
+sov <- grow(sov, entities, depth=0)
+# load('sov2.dat')
+sov
+```
+
+Identify what makes the difference based on record counts or ?
+
+```{r}
+# Pregiven sizing based on record counts
+sov <- applySizing(sov, 'wt_numrec')
+
+# Remove entities with zero records
+centers <- getCenters(sov)
+zeroCenters <- centers[centers$size==0,'name']
+sov <- void(sov, centers=zeroCenters)
+
+# Identify main centers
+sov <- applySimplicity(sov)
+sov
+```
+
+Partitioning does not help much:
+
+```{r}
+# Group the entities by module
+
+# TODO: Would be creat to see module elements clustered
+sov <- applyPartitioning(sov, 'mbrp_module')
+sov
+```
+
+Grouping by membership
+
+```{r}
+sov <- group(sov)
+
+# sov <- removePartitioning(sov)
+
+# Membership detection error analysis is not a concern
+errc <- c('ERR_NO_PRODUCT_IN_PGM.FILE', 'ERR_NOT_IN_PGM.FILE')
+sov <- void(sov, centers=errc)
+sov
+```
+
+Finally, some polishing:
+
+```{r}
+browseLayouts(sov)
+sov <- applyLayout(sov, 'layout_components')
+
+# TODO: Initial seed pregiven to ensure reproducibility
+browseSeeds(sov)
+sov <- applySeed(sov, 201)
+sov
+
+sqmain <- c('all entities', 'sizing applied', 'partitioning applied')
+sqmain <- c(sqmain, 'grouping and polishing')
+plot(sov, main=sqmain, steps=c(2, 5, 6, 10))
+```
+
