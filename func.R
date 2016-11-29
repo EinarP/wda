@@ -503,14 +503,16 @@ add_attributes <- function(ang, centers, vals=FALSE, atype='attribute') {
     apply(attrspec, 1, function(cattr) {
       clinks <- links[grepl(paste0(cattr['objsrc'], '\\|'), links$name), ]
       newattr <- unname(cattr['object'])
-      attrlink <- paste(cattr['objsrc'], newattr, sep='|') 
-      if (!attrlink %in% clinks$name & !cattr['objattr'] %in% clinks$label) {
-        newlabel <- unname(cattr['objattr'])
-        if (!newattr %in% V(ang)$name) {
-          aattr <- list(name=newattr, label=newlabel)
-          aattr <- c(aattr, type=atype, contrast=FALSE)
-          ang <<- add_vertices(tmpang, 1, attr=aattr)
-          tmpang <<- add_link(ang, cattr['objsrc'], newattr, etype='association')
+      attrlink <- paste(cattr['objsrc'], newattr, sep='|')
+      if (!attrlink %in% clinks$name) {
+        if (!(tmpang$simplicity & cattr['objattr'] %in% clinks$label)) {
+          newlabel <- unname(cattr['objattr'])
+          if (!newattr %in% V(ang)$name) {
+            aattr <- list(name=newattr, label=newlabel)
+            aattr <- c(aattr, type=atype, contrast=FALSE)
+            ang <<- add_vertices(tmpang, 1, attr=aattr)
+            tmpang <<- add_link(ang, cattr['objsrc'], newattr, etype='association')
+        }
         }
       }
       

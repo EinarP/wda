@@ -1,10 +1,12 @@
 ---
 title: "analysis"
-output: word_document
+output: 
+  word_document: 
+    highlight: tango
 ---
 
 ```{r}
-# These are sample commands with output
+# These are the sample commands with output
 rver <- R.Version()
 rver$nickname
 ```

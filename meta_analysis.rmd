@@ -1,7 +1,8 @@
 ---
 title: "anobj"
-output: 
-  html_document: 
+output:
+  word_document: default
+  html_document:
     fig_height: 8
     fig_width: 10
     highlight: tango

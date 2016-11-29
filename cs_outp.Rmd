@@ -1,11 +1,8 @@
 ---
 title: "Case study"
-output:
-  html_document:
-    highlight: pygments
-  pdf_document: default
+output: word_document
 ---
-# Overview
+Introductory paragraph goes here
 ```{r}
 # Load data observations
 suppressWarnings(library(readxl))

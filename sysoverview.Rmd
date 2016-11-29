@@ -1,16 +1,19 @@
 ---
 title: "Overview"
 output:
+  word_document: 
+    fig_height: 12
+    fig_width: 8
+    highlight: tango
   html_document: default
-  word_document: default
 ---
-TODO: Meaningful annotations
+It is not unusual for a professional to find herself facing a new complex software system and to be expected to make sense of it quickly. There may be a lot of documentation to go through and relevant training sessions, but self-exploring can complement this very well.
 
-Trying to get an overview of what is happening in the system
+We have created a program for extracing basic structural information about a particular T24 installation and will use this as a basis for our analysis
 
 ```{r message=FALSE}
 # Load observations
-library(readxl)
+suppressWarnings(library(readxl))
 tobs <- read_excel('../data/t24.xlsx')
 
 # Load transformation functions and start the sequence
@@ -18,7 +21,9 @@ source('func.R')
 sov <- analysis('System Overview', 'tobs')
 ```
 
-First attempt looks messy:
+TODO: Basic exploratory analysis
+
+Our first attempt to explore the structure highlights the challenges in doing that. There are too many items too grasp
 
 ```{r}
 # Create a structure comprised of all centers
@@ -28,7 +33,7 @@ sov <- grow(sov, entities, depth=0)
 sov
 ```
 
-Identify what makes the difference based on record counts or ?
+Certainly not should all the entities be treated equally. We can try to identify what makes the difference based on some metric like e.g. size in bytes, connectedness, or completeness. Below a simplre record count (*wt_numrec*) is used for this purpose 
 
 ```{r}
 # Pregiven sizing based on record counts
@@ -44,17 +49,17 @@ sov <- applySimplicity(sov)
 sov
 ```
 
-Partitioning does not help much:
+Partitioning by module seems to bring some additional clarity, but not too much
 
 ```{r}
 # Group the entities by module
 
-# TODO: Would be creat to see module elements clustered
+# TODO: Would be great to see module elements clustered
 sov <- applyPartitioning(sov, 'mbrp_module')
 sov
 ```
 
-Grouping by membership
+We can use partitioning for grouping the entities, which by preserving the numeric importance in summing the entities will give as already quite comprensive picture of the particular system
 
 ```{r}
 sov <- group(sov)
@@ -67,7 +72,7 @@ sov <- void(sov, centers=errc)
 sov
 ```
 
-Finally, some polishing:
+Of course, the presentation can be improved by using different layout and randomizations
 
 ```{r}
 browseLayouts(sov)
@@ -77,7 +82,11 @@ sov <- applyLayout(sov, 'layout_components')
 browseSeeds(sov)
 sov <- applySeed(sov, 201)
 sov
+```
 
+Finally, we can conclude the analysis by plotting the sequence of essential steps  
+
+```{r}
 sqmain <- c('all entities', 'sizing applied', 'partitioning applied')
 sqmain <- c(sqmain, 'grouping and polishing')
 plot(sov, main=sqmain, steps=c(2, 5, 6, 10))
