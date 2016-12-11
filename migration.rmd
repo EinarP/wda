@@ -1,6 +1,7 @@
 ---
-title: "Overview"
+title: "Migration Overview"
 output:
+  html_document: default
   word_document:
     fig_height: 8
     fig_width: 12
@@ -10,25 +11,23 @@ Frequenty there is a need to replace multiple systems with one new system or rep
 
 We have arranged related data observations in a spreadsheet and build our analysis on that
 
-TODO: Rename and rearrange func.R
-
 ```{r message=FALSE}
 # Load observations
 suppressWarnings(library(readxl))
 mobsw <- read_excel('../data/migration.xlsx')
 
 # Load transformation functions and initiate the sequence
-source('func.R')
+source('atrf.R')
 mov <- analysis('Data Migration Overview', datarefw='mobsw')
 ```
 
-TODO: Small exploratory analysis
+TODO: Light exploration on what not covered in case study exploratory analysis
 
 ```{r message=FALSE}
 str(mobsw)
 ```
 
-# Source data identification
+# Source Data Identification
 It seems natural to start from the source data identification. We will categorise the date entities according to their migration method (*mbrp_dataset*) and present a compact overview of the source system. Related entities will be prefixed with *src_*.
 
 A metric is needed for differentiating different entities. Number of records (*wt_numrec*) is not an ideal metric, but in this context can be considered good enough for rough estimations
@@ -43,67 +42,114 @@ mov <- applySizing(mov, 'wt_numrec')
 
 # Change color of entities to reflect the dataset
 mov <- applyPartitioning2(mov, 'mbrp_dataset')
+
+# Change to layout which reflects the data best 
+mov <- applyLayout(mov, 'layout_with_dh')
 mov
 ```
 
-TODO: Rename SCG to local app 1
-
-# Static data importing
+# Data extraction
 Core banking system migration is a complex process and would be difficult to conduct without having an intermediatate system between source and data systems
 
-The problem with the data is that it is constantly changing and there is only a narrow window for conducting the actual migration. Therefore, it is desirable and possible to identify parts which are less prone to change and load these (so called *static data*) earlier
+The problem with the data is that it is constantly changing and there is only a narrow window for conducting the actual migration. Therefore, it is desirable and possible to identify parts which are less prone to change and load these (so called *static data*) earlier.
+
+Contractual etc. highly time-senstitve data has to be imported similarly, whenever there is sufficient time for its subsequent exporting to target system. On the other hand, it is useful to load also the financial data for simulations before the actual migration
 
 ```{r}
 # Add extracted static entities
 entities <- browseEntities(mov, ckpt='download_static')$object
 mov <- grow(mov, entities, depth=0, ckpt='download_static')
 
+# Migrate financial data
+entities <- browseEntities(mov, ckpt='download_financial')$object
+mov <- grow(mov, entities, ckpt='download_financial')
+
 # Divide into sub-systems
 mov <- applyPartitioning(mov, 'mbrp_system')
+
+# Group extracted source entities for more compact display
+ctr <- getCenters(mov)
+csrc <- ctr[ctr$membership=='src', ]
+mov <- group(mov, 'src_static', csrc$name[csrc$membership2=='static'])
+mov <- group(mov, 'src_financial', csrc$name[csrc$membership2=='financial'])
+mov <- group(mov, 'src_skip', csrc$name[csrc$membership2=='skip'])
+
+# Change to layout which suits for partitioning 
+mov <- applyLayout(mov, 'layout_components')
 mov
 ```
 
-# Static data transformation and exporting
+# Static and Manual Data Migration
 Necessary transformations have to be carried on in the intermediary system and then the static data can be exported into the target system
 
 Target system entities are prefixed with *trg_* for presentational purposes. In reality, the entity is likely named the same in source and target systems
 
 ```{r}
-entities <- browseEntities(mov, ckpt='upload_static')$object
-mov <- grow(mov, entities, ckpt='upload_static')
+entities <- browseEntities(mov, ckpt='upload_static_manual')$object
+mov <- grow(mov, entities, ckpt='upload_static_manual')
+
 mov
 ```
 
-Note that also related manually transferrable items have been migrated
+Note that also related manually transferrable items have been migrated.
 
-# Financial data importing
-Contractual etc. highly time-senstitve data has to be imported similarly, whenever there is sufficient time for its subsequent exporting to target system
+After migration we need to reconcile the data. In case of static data that means simple one-to-one matching of source and target data, but also analysis of the items skipped and verifying correctness of conversions rules
 
 ```{r}
-entities <- browseEntities(mov, ckpt='download_financial')$object
-mov <- grow(mov, entities, ckpt='download_financial')
+entities <- browseEntities(mov, ckpt='reconciliation')
+mov <- grow(mov, entities$object[entities$mbrp_dataset=='static'], ckpt='reconciliation')
+
+ctr <- getCenters(mov)
+
+# Remaining source items can be now grouped
+ctrman <- ctr$name[ctr$membership=='src' & ctr$membership2=='manual']
+mov <- group(mov, 'src_manual', ctrman)
+
+# Cannot group target static entities yet, as these may be linked to other items
+ctrst <- ctr[ctr$membership2=='static', ]
+mov <- group(mov, 'imp_src_static', ctrst$name[grep('imp_src_', ctrst$name)])
+mov <- group(mov, 'exp_static', ctrst$name[grep('exp_', ctrst$name)])
+mov <- group(mov, 'imp_trg_static', ctrst$name[grep('imp_trg_', ctrst$name)])
+
 mov
 ```
 
-# Financial data transformation and exporting
-Necessary transformations have to be carried on in the intermediary system and then the financial data can be exported into the target system
+# Financial Data Transformation and Migration
+Necessary transformations have to be carried on in the intermediary system and then the financial data can be exported into the target system. As this is constantly changing data, it has to reload right before migration
 
 ```{r}
 entities <- browseEntities(mov, ckpt='upload_financial')$object
 mov <- grow(mov, entities, ckpt='upload_financial')
 mov
+
+ctr <- getCenters(mov)
+
+# Target and most static entites can now be grouped
+mov <- group(mov, 'trg_manual', ctr$name[ctr$membership=='trg' & ctr$membership2=='manual'])
+
+ctrst <- ctr[ctr$membership2=='static', ]
+mov <- group(mov, 'trg_static', ctrst$name[grep('^trg_', ctrst$name)])
+
+ctrfin <- ctr[ctr$membership2=='financial', ]
+mov <- group(mov, 'trg_financial', ctrfin$name[grep('^trg_', ctrfin$name)])
+mov <- group(mov, 'exp_financial', ctrfin$name[grep('^exp_', ctrfin$name)])
+
+mov
 ```
 
-# Data reconciliation
+# Financial reconciliation
 Source and target data have to be reconciled. Here we have presented this as separate step, allthough it is likely to have various reconciliation activities before all the data has been migrated, for example after static data export
 
 ```{r}
-entities <- browseEntities(mov, ckpt='reconciliation')$object
-mov <- grow(mov, entities, ckpt='reconciliation')
+entities <- browseEntities(mov, ckpt='reconciliation')
+mov <- grow(mov, entities$object[entities$mbrp_dataset=='financial'], ckpt='reconciliation')
 
-mov <- applySeed(mov, 376)
+# Group remainining financial items
+ctr <- getCenters(mov)
+ctrfin <- ctr[ctr$membership2=='financial', ]
+mov <- group(mov, 'imp_src_financial', ctrfin$name[grep('imp_src_', ctrfin$name)])
+mov <- group(mov, 'imp_trg_financial', ctrfin$name[grep('imp_trg_', ctrfin$name)])
 
-#mov <- group(mov)
 mov
 ```
 
@@ -113,7 +159,7 @@ To conclude we will present an overview of the whole sequence by plotting all th
 TODO: Ideally this could have been done automatically by checkpoints
 
 ```{r}
-sqmain <- c('identification', 'static download', 'static upload')
-sqmain <- c(sqmain, 'financial download', 'financial upload', 'reconciliation')
-plot(mov, main=sqmain, steps=c(4, 6, 7, 8, 9, 11), ncol=3)
+sqmain <- c('identification', 'extraction', 'static migration')
+sqmain <- c(sqmain, 'static reconciliation', 'financial migration', 'full reconciliation')
+plot(mov, main=sqmain, steps=c(5, 12, 13, 18, 22, length(mov)), ncol=3)
 ```

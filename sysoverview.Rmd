@@ -17,7 +17,7 @@ suppressWarnings(library(readxl))
 tobs <- read_excel('../data/t24.xlsx')
 
 # Load transformation functions and start the sequence
-source('func.R')
+source('atrf.R')
 sov <- analysis('System Overview', 'tobs')
 ```
 
@@ -62,7 +62,7 @@ sov
 We can use partitioning for grouping the entities, which by preserving the numeric importance in summing the entities will give as already quite comprensive picture of the particular system
 
 ```{r}
-sov <- group(sov)
+sov <- group(sov, by='membership')
 
 # sov <- removePartitioning(sov)
 

@@ -1,5 +1,5 @@
 
-# TODO: Rename to atrf.r and split into smaller files
+# TODO: Split into smaller files somehow
 
 suppressPackageStartupMessages(library(igraph))
 
@@ -326,13 +326,18 @@ plot_ang <- function(ang, xlab=NULL, main=NULL) {
     V(ang)[V(ang)$type=='agroup']$size <- thmopt$agroup_size
   } else {
     # TODO: Adjust different types differently
-    maxsize <- max(V(ang)$size)
-    if (maxsize > 100) {
-      V(ang)$size <- log1p(V(ang)$size)
-      maxsize <- max(V(ang)$size)
-    }
+#    maxsize <- max(V(ang)$size)
+#    if (maxsize > 100) {
+ #     V(ang)$size <- log1p(V(ang)$size)
+  #    maxsize <- max(V(ang)$size)
+ #     V(ang)$size <- log(V(ang)$size, 1.1)
+#    }
     # TODO: vertex_scaling should be adjusted by center count
-    V(ang)$size <- round(V(ang)$size/maxsize * thmopt$vertex_scaling)
+#    V(ang)$size <- round(V(ang)$size/maxsize * thmopt$vertex_scaling)
+ #   maxsize <- max(V(ang)$size)
+#    V(ang)$size <- V(ang)$size/maxsize * thmopt$vertex_scaling
+    # TODO: Max should be proportional to number of items
+    V(ang)$size <- 5 + V(ang)$size/max(V(ang)$size)*35
   }
   
   # Differentiated communities by entity coloring
@@ -660,9 +665,15 @@ removePartitioning2 <- function(sq) {
 # Add boundary
 partitioning <- function(ang, ...) {
 
+  # TODO: Support grouping before setting the membership
+  comm_idx <- V(ang)[V(ang)$type %in% c('entity', 'attribute')]
+  
+  comm <- get_communities(ang, ang$partitioning)
+  V(ang)$membership[comm_idx] <- comm[comm_idx]
+ 
   # TODO: Not most efficient to always reapply both
-  V(ang)$membership <- get_communities(ang, ang$partitioning)
-  V(ang)$membership2 <- get_communities(ang, ang$partitioning2)
+  comm <- get_communities(ang, ang$partitioning2)
+  V(ang)$membership2[comm_idx] <- comm[comm_idx]
 
   ang
 }
@@ -1011,40 +1022,73 @@ contrast <- function(ang, ...) {
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# User friendly grouping transformation function calls
-group <- function(sq, group=NULL, members=NULL, ...) {
-  if (is.null(group[1]) & is.null(members[1])) {
-    trf(sq, 'group_communities', cl=match.call())
-  } else {
-    trf(sq, 'group_trf', group=group, members=members, cl=match.call())
-  } 
-}
-
-# Group entities by community membership 
-group_communities <- function(ang, ...) {
-  
-  ang <- contract(ang, as.factor(V(ang)$membership), vertex.attr.comb=toString)
-  
-  V(ang)$type <- 'egroup'
-  V(ang)$group <- V(ang)$name
-  V(ang)$membership <- gsub(',.*$', '', V(ang)$membership)
-  V(ang)$name <- V(ang)$membership
-  V(ang)$label <- V(ang)$membership
-  V(ang)$contrast <- FALSE
-  
-  sumsz <- sapply(V(ang)$size, function(x) {
-    sum(as.numeric(unlist(strsplit(gsub(' ', '', x), ','))))
-  })
-  ang <- delete_vertex_attr(ang, 'size')
-  V(ang)$size <- sumsz
-  
-  # TODO: maintain edge attributes like labels
-  ang <- simplify(ang, remove.loops=T)
-
-  ang
+# User friendly grouping transformation function call
+group <- function(sq, name='group1', members=NULL, by=NULL, ...) {
+  trf(sq, 'group_trf', gname=name, members=members, by=by, cl=match.call())
 }
 
 group_trf <- function(ang, ...) {
+  
+  grp_name <- list(...)$gname
+  grp_members <- list(...)$members  
+  grp_attr <- list(...)$by
+
+  # Store original entities
+  V(ang)$group <- V(ang)$name
+  
+  # Group either by given members or attribute
+  if (is.null(grp_attr)) {
+    gidx <- ifelse(V(ang)$name %in% grp_members, 'isgroupmember', V(ang)$name)
+    
+    gidxb <- gidx=='isgroupmember'
+    ang <- set_vertex_attr(ang, 'type', index=gidxb, value='egroup')
+    ang <- set_vertex_attr(ang, 'name', index=gidxb, value=grp_name)
+  } else {
+    gidx <- get.vertex.attribute(ang, grp_attr)
+    
+    V(ang)$type <- 'egroup'
+    V(ang)$name <- get.vertex.attribute(ang, grp_attr)
+  }
+  
+  # Contract the graph by grouping index
+  ang <- contract(ang, as.factor(gidx), vertex.attr.comb=toString)
+  
+  # Tidy up the atrributes
+  for (cur_attr in list.vertex.attributes(ang)) {
+    if (!cur_attr %in% c('size')) {
+      cur_attr_val <- gsub(',.*$', '', get.vertex.attribute(ang, cur_attr))
+      ang <- set_vertex_attr(ang, cur_attr, value=cur_attr_val)
+    } else {
+      sumsz <- sapply(V(ang)$size, function(x) {
+        sum(as.numeric(unlist(strsplit(gsub(' ', '', x), ','))))
+      })
+      ang <- delete_vertex_attr(ang, 'size')
+      V(ang)$size <- sumsz
+    }
+  # TODO: Boolean attributes (e.g. contrast) handling
+  }
+  V(ang)$label <- V(ang)$name
+  
+  if (is.null(grp_attr)) {
+    
+    # Remove self-references
+    el <- get.edgelist(ang)
+    ang <- delete.edges(ang, E(ang)[el[ ,1]==grp_name & el[ ,1]==el[ ,2]])
+    
+    # Grouped attribute labels ambigous
+    el <- get.edgelist(ang)
+    E(ang)[el[ ,1]==grp_name]$label <- NA
+    E(ang)[el[ ,2]==grp_name]$label <- NA
+  } else {
+    
+    # TODO: maintain edge attributes like labels
+    ang <- simplify(ang, remove.loops=T)
+  }
+  
+  ang
+}
+
+group_members <- function(ang, ...) {
   
   group <- list(...)$group
   members <- list(...)$members
@@ -1056,7 +1100,37 @@ group_trf <- function(ang, ...) {
     ang <- delete.vertices(ang, match(members, V(ang)$name))
   } else {
     
+    gidx <- factor(ifelse(V(ang)$name %in% members, 'groupthis', V(ang)$name))
+    
+    gidx <- 1:len(V(ang)) ; vidx <- 2
+    for (idx in seq_along(V(ang))) {
+      if (V(ang)[idx]$name %in% members) {
+        gidx[idx] <- 1
+      } else {
+        gidx[idx] <- 1
+      }
+    }
+    
     # TODO: Implement entity grouping
+    ang <- contract(ang, as.factor(V(ang)$membership2), vertex.attr.comb=toString)
+    
+    V(ang)$type <- 'egroup'
+    V(ang)$group <- V(ang)$name
+    V(ang)$membership2 <- gsub(',.*$', '', V(ang)$membership2)
+    V(ang)$name <- V(ang)$membership2
+    V(ang)$label <- V(ang)$membership2
+    V(ang)$contrast <- FALSE
+    
+    sumsz <- sapply(V(ang)$size, function(x) {
+      sum(as.numeric(unlist(strsplit(gsub(' ', '', x), ','))))
+    })
+    ang <- delete_vertex_attr(ang, 'size')
+    V(ang)$size <- sumsz
+    
+    # TODO: maintain edge attributes like labels
+    ang <- simplify(ang, remove.loops=T)
+    
+    ang
   } 
   
   ang
@@ -1118,7 +1192,8 @@ fsquare <- function(coords, v=NULL, params) {
   if (length(vertex.color) != 1 && !is.null(v)) {
     vertex.color <- vertex.color[v]
   }
-  vertex.size <- 1/200 * params("vertex", "size")
+ # Size should be somehow related to normal squre size (initially 1/200)
+  vertex.size <- 1/100 * params("vertex", "size")
   if (length(vertex.size) != 1 && !is.null(v)) {
     vertex.size <- vertex.size[v]
   }
