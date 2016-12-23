@@ -1,8 +1,12 @@
 ---
-title: "Case study"
-output: word_document
+title: "Case Study Data"
+output:
+  word_document:
+    highlight: tango
+  html_document: default
 ---
-Introductory paragraph goes here
+We have run a data collection program in the test system. The program fetched the information on the system structure from relevant structure definition files (e.g. STANDARD.SELECTION, PGM.FILES) and took random samples from all the data files (up to 30 samples per file). The data observations have been loaded into a spreadsheet for initial correctness checking:
+
 ```{r}
 # Load data observations
 suppressWarnings(library(readxl))
@@ -30,64 +34,93 @@ for (idx in 1:nrow(t24obs)) {
 # Observations data frame structure
 str(t24obs, strict.width='cut', width=70)
 
-#Summary of object properties observed
+```
+It is impossible and wasteful to anticipate every possible property and statistic which might be needed in later analysis. Therefore, the observations were arranged in flexible object-property-value format. This time the following properties and samples were collected:
+
+```{r}
+# Summary of object properties observed
 table(t24obs$property)
 
-#Sample observations of each property
+# Sample observations of each property
 set.seed(123)
 sobs <- t(sapply(unique(t24obs$property), function(x) {
   sobs <- t24obs[t24obs$property==x,]; sobs[sample(1:nrow(sobs), 1), ] }))
 print(as.data.frame(sobs), row.names=FALSE)
 
-# Convert to wide format
-source('func.R')
-t24 <- analysis('vizgraph', 't24obs')
+```
+
+For making sense of the data is reasonable to convert it to a “wide format”. Below this is achieved by using the helper functions developed for structural analysis and which will be discussed later. Please also note the total number of observations:
+
+```{r}
+# Load analysis functions and initialize the sequence
+source('atrf.R')
+t24 <- analysis('t24expl', 't24obs')
+
+# Retrieve the data in wide format
 obsw <- browseData(t24)
 str(obsw, give.attr=FALSE, strict.width='cut', width=70)
 ```
 
-# Plotting 
+We will build a summary plot (a “dashboard”) to visualize the essential aspects of a particular system, consisting of five sub-plots.
+
+Firstly, modularization can provide us a first glimpse to the whole system. We will present the discovered modules in a barplot, each module's heigth reflecting the number of tables belonging to a module and width the record count. Logarithmic presentation of the latter should be considered, also we have skipped all the historical records (e.g. every contract change might be stored as a new record, thus in a lifetime the contract may have hundreds of copies). Distinction has been made between core tables (created by the vendor) and local tables. Here the volume of the latter is small, but the ratio may vary drastically between sites, depending on the customer wishes and the age of the system (older installations tend to have more local developments):
+
+```{r}
+m <- obsw[!is.na(obsw$mbrp_module), ]
+
+# Mark unknown items
+m[grepl('ERR_', m$mbrp_module), 'mbrp_module'] <- '?'
+
+# Record counts by module
+mrec <- aggregate(wt_numrec~mbrp_module, m, sum)
+mrec$width <- round(log10(1+mrec$wt_numrec))
+colnames(mrec) <- c('module', 'numrec', 'lognrec')
+
+# Core and local file counts by module
+mcore <- data.frame(table(m[m$mbrp_localcore=='core','mbrp_module']))
+mlocal <- data.frame(table(m[m$mbrp_localcore=='local','mbrp_module']))
+mtab <- merge(mcore, mlocal, by='Var1', all.x=TRUE)
+colnames(mtab) <- c('module', 'corentab', 'localntab')
+
+# Modularization plot data
+modp <- merge(mtab, mrec, by='module')
+modp[is.na(modp)] <- 0
+modp
+```
+
+Number of records and attributes might be indicative metrics, but these can be also quite deceptive. The same can be said about the data size and completeness (fill rate) information. On the other hand, we could have utilized more advanced metrics like  diversity of values.
+
+Now we have prepared all the data for the summary plot:
+
 ```{r}
 # Plot parameters
 par(mar=c(4,4,3,1), oma=c(1,1,2,0), cex.lab=1)
 layout(matrix(c(1,2,4,1,3,5), nrow=3))
 
 # Modularization plot
-obsw[grepl('ERR_', obsw$mbrp_module), 'mbrp_module'] <- '?'
- 
-md <- obsw[!is.na(obsw$mbrp_module), c('object','mbrp_module','mbrp_localcore','wt_numrec')]
-mcore <- data.frame(table(md[md$mbrp_localcore=='core','mbrp_module']))
-mlocal <- data.frame(table(md[md$mbrp_localcore=='local','mbrp_module']))
-maggr <- aggregate(wt_numrec~mbrp_module, md, sum)
+m <- t(modp)
+main <- 'Modularization'
+xlab <- 'module codes (?: unknown; bar width: number of records (log10)'
+ylab <- 'number of files (tables)'
+barplot(m[c('corentab', 'localntab'), ], names=m['module', ], 
+  width=as.numeric(m['lognrec', ]), space=0, main=main, cex.names=0.8,
+  xlab=xlab, ylab=ylab, legend=c('core','local'))
 
-maggr$width = round(log10(1+maggr$wt_numrec))
-m <- merge(mcore, mlocal, by="Var1", all.x=TRUE)
-m <- merge(m, maggr, by.x="Var1", by.y="mbrp_module")
-m <- t(m)
-m[is.na(m)] <- 0
-
-# TODO: Record count not taking into account history very wrong?
-mods <- rbind(as.numeric(m[2, ]), as.numeric(m[3, ]))
-
-pmain <- 'Modularization'
-pxlab <- 'module codes (?: unknown; bar width: number of records [log10(1+sum(wt_numrec))]'
-pylab <- 'number of tables'
-pleg <- c('core','local')
-barplot(mods, names=m[1, ], width=as.numeric(m[5, ]), space=0, main=pmain, cex.names=0.8, xlab=pxlab, ylab=pylab, legend=pleg)
-
-# Plot number of records and attributes
+# Number of records and attributes plots
+ylab <- 'frequency'
 with(obsw, {
-  pmain <- 'Number of Records'
-  pxlab <- 'records per table [log10(1+wt_numrec)]'
-  pylab <- 'frequency'
-  hist(log10(1+wt_numrec), breaks=20, main=pmain, xlab=pxlab, ylab=pylab)
-  text(4, 1000, paste('Total number of tables:', sum(mods)))
+  main <- 'Number of Records'
+  xlab <- 'records per table [log10(1+wt_numrec)]'
+  hist(log10(1+wt_numrec), breaks=20, main=main, xlab=xlab, ylab=ylab)
+  ntab <- sum(as.numeric(m[c('corentab', 'localntab'), ]))
+  text(4, 1000, paste('Total number of tables:', ntab))
   text(4, 800, paste('Total number of records:', sum(wt_numrec, na.rm=TRUE)))
   
-  pmain <- 'Number of Attributes'
-  pxlab <- 'attributes per record [wt_numattr]'
-  hist(wt_numattr, breaks=20, main=pmain, xlab=pxlab, ylab=pylab)
-  text(120, 450, paste('Mean number of attributes:', round(mean(wt_numattr, na.rm=TRUE))))
+  main <- 'Number of Attributes'
+  xlab <- 'attributes per record [wt_numattr]'
+  hist(wt_numattr, breaks=20, main=main, xlab=xlab, ylab=ylab)
+  mna <- round(mean(wt_numattr, na.rm=TRUE))
+  text(120, 450, paste('Mean number of attributes:', mna))
 })
 
 # Sizing plot
@@ -100,14 +133,16 @@ wt_volattr <- obsw[!is.na(obsw$wt_volattr), 'wt_volattr']
 va <- cut(wt_volattr, breaks=cb, include.lowest=TRUE)
 va <- table(va)/length(va)*100
 
-pxlab <- 'item size (bytes) [wt_volrec; wt_volattr]'
-pylab <- 'percent of items'
-pleg <- c('records','attributes')
-barplot(rbind(vr, va), beside=TRUE, main='Sizes', xlab=pxlab, ylab=pylab, legend=pleg)
+xlab <- 'item size (bytes) [wt_volrec; wt_volattr]'
+ylab <- 'percent of items'
+leg <- c('records','attributes')
+barplot(rbind(vr, va), beside=TRUE, main='Sizes',
+  xlab=xlab, ylab=ylab, legend=leg)
+
 totsize <- round(sum(volrec$wt_volrec*volrec$wt_numrec)/1024/1024)
 text(20, 50, paste('Total data size:', totsize, 'MB'))
 
-# Prepare data for fill plot
+# Completeness plot
 wt_fillrec <- obsw[!is.na(obsw$wt_fillrec), 'wt_fillrec']*100
 fr <- cut(wt_fillrec, breaks=seq(0, 100, by=10), include.lowest=TRUE)
 fr <- table(fr)/length(fr)*100
@@ -116,12 +151,12 @@ wt_fillattr <- obsw[!is.na(obsw$wt_fillattr), 'wt_fillattr']*100
 fa <- cut(wt_fillattr, breaks=seq(0, 100, by=10), include.lowest=TRUE)
 fa <- table(fa)/length(fa)*100
 
-pxlab <- 'completeness percentage [wt_fillrec; wt_fillattr]'
-barplot(rbind(fr, fa), beside=TRUE, main='Completeness', xlab=pxlab, ylab=pylab, legend=pleg)
+xlab <- 'completeness percentage [wt_fillrec; wt_fillattr]'
+barplot(rbind(fr, fa), beside=TRUE, main='Completeness',
+  xlab=xlab, ylab=ylab, legend=leg)
 
-# TODO: Shouldn't total record and attribute completenes match?
-# text(18, 50, paste('Mean record completeness (%):', round(mean(wt_fillrec, na.rm=TRUE))))
-text(18, 30, paste0('Mean completeness: ', round(mean(wt_fillattr, na.rm=TRUE)), '%'))
+mnc <- round(mean(wt_fillattr, na.rm=TRUE))
+text(18, 30, paste0('Mean completeness: ', mnc, '%'))
 
 mtext("Summary of Live Data Observations", outer=TRUE, cex=1.3)
 ```

@@ -21,7 +21,17 @@ source('atrf.R')
 sov <- analysis('System Overview', 'tobs')
 ```
 
-TODO: Basic exploratory analysis
+Light exploration on what not covered in case study exploratory analysis
+
+Note the number of observations and their content sampling
+
+```{r message=FALSE}
+# Observations in a long format
+str(tobs, strict.width='cut', width=70)
+
+# Observations in a wide format
+str(tobsw[ ,1:(ncol(tobsw)-3)], strict.width='cut', width=70)
+```
 
 Our first attempt to explore the structure highlights the challenges in doing that. There are too many items too grasp
 
@@ -77,6 +87,7 @@ Of course, the presentation can be improved by using different layout and random
 ```{r}
 browseLayouts(sov)
 sov <- applyLayout(sov, 'layout_components')
+sov
 
 # TODO: Initial seed pregiven to ensure reproducibility
 browseSeeds(sov)
@@ -89,6 +100,6 @@ Finally, we can conclude the analysis by plotting the sequence of essential step
 ```{r}
 sqmain <- c('all entities', 'sizing applied', 'partitioning applied')
 sqmain <- c(sqmain, 'grouping and polishing')
-plot(sov, main=sqmain, steps=c(2, 5, 6, 10))
+signoff(sov, thumb_seq=c(2, 5, 6, 10), thumb_narr=sqmain)
 ```
 

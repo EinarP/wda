@@ -276,7 +276,7 @@ plot_ang <- function(ang, xlab=NULL, main=NULL) {
     plopt <- c(plopt, edge.arrow.mode=0, vertex.label.cex=0.8)
     
     # TODO: Dynamic or parameterized determination of big enough criteria
-    namedsz <- 10
+    namedsz <- 20
     if (length(V(ang)) > namedsz) {
       bigenough <- V(ang)[order(V(ang)$size, decreasing=TRUE)[namedsz]]$size
       for(idx in seq_along(V(ang))) {
@@ -311,7 +311,7 @@ plot_ang <- function(ang, xlab=NULL, main=NULL) {
   }
   
   plopt <- c(plopt, layout=list(layout), 
-    vertex.label.family='sans', edge.label.family='sans', edge.arrow.size=0.2,
+    vertex.label.family='sans', edge.label.family='sans', edge.arrow.size=0.3,
     edge.label.cex=0.8, edge.curved=list(0.3*which_mutual(ang)))
   
   # TODO: cluster coloring
@@ -1394,18 +1394,15 @@ thevoid <- function(ang, ...) {
 # NOT-SEPARATENESS transformations
 ################################################################################
 
-# User friendly transformation function call
-signoff <- function(sq, ...) {
-  trf(sq, 'notseparateness', cl=match.call())
-}
-
 # Conclude the sequence
-notseparateness <- function(ang, ...) {
-  
-  # TODO: Implement required functionality
-  cat('Some summary info about the sequence...', '\n\n')
-  
-  cat('Packaging the data and the code...', '\n\n')
-  
-  ang
+signoff <- function(sq, thumb_seq=NULL, thumb_narr=NULL, ...) {
+
+  if (!is.null(thumb_seq)) {
+
+    # TODO: Use checkpoints if thumb_narr not present
+    nc <- ifelse(length(thumb_seq)%%3==0, 3, 2)
+    plot(sq, main=thumb_narr, steps=thumb_seq, ncol=nc)
+  }
+
+  # TODO: Implement packaging of the data and the code
 }

@@ -1,11 +1,11 @@
 ---
-title: "Migration Overview"
+title: "Overview"
 output:
-  html_document: default
   word_document:
     fig_height: 8
     fig_width: 12
     highlight: tango
+  html_document: default
 ---
 Frequenty there is a need to replace multiple systems with one new system or replace older version of the system with newer version but vendor supported upgrade is not possible. We call this process migration and illustrate below based on a particular instance of moving from significantly older version of the core banking system to a newer version
 
@@ -21,10 +21,12 @@ source('atrf.R')
 mov <- analysis('Data Migration Overview', datarefw='mobsw')
 ```
 
-TODO: Light exploration on what not covered in case study exploratory analysis
+Light exploration on what not covered in case study exploratory analysis
+
+Note the number of observations and their content sampling
 
 ```{r message=FALSE}
-str(mobsw)
+str(mobsw[ ,1:(ncol(mobsw)-3)], strict.width='cut', width=70)
 ```
 
 # Source Data Identification
@@ -34,16 +36,16 @@ A metric is needed for differentiating different entities. Number of records (*w
 
 ```{r}
 # Create a structure comprised of source centers
-entities <- browseEntities(mov, ckpt='baseline')$object
-mov <- grow(mov, entities, depth=0, ckpt='baseline')
+e <- browseEntities(mov, ckpt='baseline')$object
+mov <- grow(mov, e, depth=0, ckpt='baseline')
 
-# Change size of the edges to reflect record count
+# Change the size of vertices to reflect record count
 mov <- applySizing(mov, 'wt_numrec')
 
-# Change color of entities to reflect the dataset
+# Change the color of vertices to reflect the dataset
 mov <- applyPartitioning2(mov, 'mbrp_dataset')
 
-# Change to layout which reflects the data best 
+# Switch to layout which reflects the data best 
 mov <- applyLayout(mov, 'layout_with_dh')
 mov
 ```
@@ -55,26 +57,33 @@ The problem with the data is that it is constantly changing and there is only a 
 
 Contractual etc. highly time-senstitve data has to be imported similarly, whenever there is sufficient time for its subsequent exporting to target system. On the other hand, it is useful to load also the financial data for simulations before the actual migration
 
+This explains separate checkpoints for static and financial data extraction
+
 ```{r}
 # Add extracted static entities
-entities <- browseEntities(mov, ckpt='download_static')$object
-mov <- grow(mov, entities, depth=0, ckpt='download_static')
+e <- browseEntities(mov, ckpt='imp_static')$object
+mov <- grow(mov, e, depth=0, ckpt='imp_static')
 
 # Migrate financial data
-entities <- browseEntities(mov, ckpt='download_financial')$object
-mov <- grow(mov, entities, ckpt='download_financial')
+e <- browseEntities(mov, ckpt='imp_financial')$object
+mov <- grow(mov, e, ckpt='imp_financial')
 
 # Divide into sub-systems
 mov <- applyPartitioning(mov, 'mbrp_system')
 
 # Group extracted source entities for more compact display
-ctr <- getCenters(mov)
-csrc <- ctr[ctr$membership=='src', ]
-mov <- group(mov, 'src_static', csrc$name[csrc$membership2=='static'])
-mov <- group(mov, 'src_financial', csrc$name[csrc$membership2=='financial'])
-mov <- group(mov, 'src_skip', csrc$name[csrc$membership2=='skip'])
+c <- getCenters(mov)
 
-# Change to layout which suits for partitioning 
+src_stat_mbr <- c[c$membership=='src' & c$membership2=='static','name']
+mov <- group(mov, 'src_static', src_stat_mbr)
+
+src_fin_mbr <- c[c$membership=='src' & c$membership2=='financial','name']
+mov <- group(mov, 'src_financial', src_fin_mbr)
+
+src_skip_mbr <- c[c$membership=='src' & c$membership2=='skip','name']
+mov <- group(mov, 'src_skip', src_skip_mbr)
+
+# Switch to layout which suits for partitioning 
 mov <- applyLayout(mov, 'layout_components')
 mov
 ```
@@ -85,8 +94,8 @@ Necessary transformations have to be carried on in the intermediary system and t
 Target system entities are prefixed with *trg_* for presentational purposes. In reality, the entity is likely named the same in source and target systems
 
 ```{r}
-entities <- browseEntities(mov, ckpt='upload_static_manual')$object
-mov <- grow(mov, entities, ckpt='upload_static_manual')
+e <- browseEntities(mov, ckpt='exp_static_man')$object
+mov <- grow(mov, e, ckpt='exp_static_man')
 
 mov
 ```
@@ -96,20 +105,26 @@ Note that also related manually transferrable items have been migrated.
 After migration we need to reconcile the data. In case of static data that means simple one-to-one matching of source and target data, but also analysis of the items skipped and verifying correctness of conversions rules
 
 ```{r}
-entities <- browseEntities(mov, ckpt='reconciliation')
-mov <- grow(mov, entities$object[entities$mbrp_dataset=='static'], ckpt='reconciliation')
+e <- browseEntities(mov, ckpt='recon')
+mov <- grow(mov, e$object[e$mbrp_dataset=='static'], ckpt='recon')
 
-ctr <- getCenters(mov)
+# Remaining source items can be grouped now
+c <- getCenters(mov)
 
-# Remaining source items can be now grouped
-ctrman <- ctr$name[ctr$membership=='src' & ctr$membership2=='manual']
-mov <- group(mov, 'src_manual', ctrman)
+src_man_mbr <- c$name[c$membership=='src' & c$membership2=='manual']
+mov <- group(mov, 'src_manual', src_man_mbr)
 
-# Cannot group target static entities yet, as these may be linked to other items
-ctrst <- ctr[ctr$membership2=='static', ]
-mov <- group(mov, 'imp_src_static', ctrst$name[grep('imp_src_', ctrst$name)])
-mov <- group(mov, 'exp_static', ctrst$name[grep('exp_', ctrst$name)])
-mov <- group(mov, 'imp_trg_static', ctrst$name[grep('imp_trg_', ctrst$name)])
+# Most (except target) static entities can be grouped as well
+cs <- c[c$membership2=='static','name']
+
+imp_src_mbr <- grep('^imp_src_', cs, value=TRUE)
+mov <- group(mov, 'imp_src_static', imp_src_mbr)
+
+exp_mbr <- grep('^exp_', cs, value=TRUE)
+mov <- group(mov, 'exp_static', exp_mbr)
+
+imp_trg_mbr <- grep('^imp_trg_', cs, value=TRUE)
+mov <- group(mov, 'imp_trg_static', imp_trg_mbr)
 
 mov
 ```
@@ -118,37 +133,42 @@ mov
 Necessary transformations have to be carried on in the intermediary system and then the financial data can be exported into the target system. As this is constantly changing data, it has to reload right before migration
 
 ```{r}
-entities <- browseEntities(mov, ckpt='upload_financial')$object
-mov <- grow(mov, entities, ckpt='upload_financial')
+e <- browseEntities(mov, ckpt='exp_financial')$object
+mov <- grow(mov, e, ckpt='exp_financial')
 mov
 
-ctr <- getCenters(mov)
+# Target and some financial entites can now be grouped
+c <- getCenters(mov)
 
-# Target and most static entites can now be grouped
-mov <- group(mov, 'trg_manual', ctr$name[ctr$membership=='trg' & ctr$membership2=='manual'])
+trg_man_mbr <- c$name[c$membership=='trg' & c$membership2=='manual']
+mov <- group(mov, 'trg_manual', trg_man_mbr)
 
-ctrst <- ctr[ctr$membership2=='static', ]
-mov <- group(mov, 'trg_static', ctrst$name[grep('^trg_', ctrst$name)])
+trg_stat_mbr <- grep('^trg_', c[c$membership2=='static','name'], value=TRUE)
+mov <- group(mov, 'trg_static', trg_stat_mbr)
 
-ctrfin <- ctr[ctr$membership2=='financial', ]
-mov <- group(mov, 'trg_financial', ctrfin$name[grep('^trg_', ctrfin$name)])
-mov <- group(mov, 'exp_financial', ctrfin$name[grep('^exp_', ctrfin$name)])
+cf <- c[c$membership2=='financial','name']
+trg_fin_mbr <- grep('^trg_', cf, value=TRUE)
+mov <- group(mov, 'trg_financial', trg_fin_mbr)
+exp_fin_mbr <- grep('^exp_', cf, value=TRUE)
+mov <- group(mov, 'exp_financial', exp_fin_mbr)
 
 mov
 ```
 
-# Financial reconciliation
+# Full reconciliation
 Source and target data have to be reconciled. Here we have presented this as separate step, allthough it is likely to have various reconciliation activities before all the data has been migrated, for example after static data export
 
 ```{r}
-entities <- browseEntities(mov, ckpt='reconciliation')
-mov <- grow(mov, entities$object[entities$mbrp_dataset=='financial'], ckpt='reconciliation')
+e <- browseEntities(mov, ckpt='recon')
+mov <- grow(mov, e$object[e$mbrp_dataset=='financial'], ckpt='recon')
 
 # Group remainining financial items
-ctr <- getCenters(mov)
-ctrfin <- ctr[ctr$membership2=='financial', ]
-mov <- group(mov, 'imp_src_financial', ctrfin$name[grep('imp_src_', ctrfin$name)])
-mov <- group(mov, 'imp_trg_financial', ctrfin$name[grep('imp_trg_', ctrfin$name)])
+c <- getCenters(mov)
+cf <- c[c$membership2=='financial','name']
+ifsrc_mbr <- grep('^imp_src_', cf, value=TRUE)
+mov <- group(mov, 'imp_src_financial', ifsrc_mbr)
+iftrg_mbr <- grep('^imp_trg_', cf, value=TRUE)
+mov <- group(mov, 'imp_trg_financial', iftrg_mbr)
 
 mov
 ```
@@ -156,10 +176,10 @@ mov
 # Summary
 To conclude we will present an overview of the whole sequence by plotting all the representitive steps in one graph
 
-TODO: Ideally this could have been done automatically by checkpoints
 
 ```{r}
-sqmain <- c('identification', 'extraction', 'static migration')
-sqmain <- c(sqmain, 'static reconciliation', 'financial migration', 'full reconciliation')
-plot(mov, main=sqmain, steps=c(5, 12, 13, 18, 22, length(mov)), ncol=3)
+sqm <- c('identification', 'extraction')
+sqm <- c(sqm, 'static migration', 'static reconciliation')
+sqm <- c(sqm, 'financial migration', 'full reconciliation')
+signoff(mov, thumb_seq=c(5, 12, 13, 18, 22, length(mov)), thumb_narr=sqm)
 ```

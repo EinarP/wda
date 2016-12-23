@@ -1,7 +1,10 @@
 ---
-title: "anobj"
+title: "meta"
 output:
-  word_document: default
+  word_document: 
+    fig_height: 10
+    fig_width: 8
+    highlight: tango
   html_document:
     fig_height: 8
     fig_width: 10
@@ -12,14 +15,12 @@ Progression of the analysis has a certain structure. This stucture might contain
 ## Observations
 
 ```{r message=FALSE}
-library(ggplot2)
-
-# Common functions
-source('func.R')
+# Load common structural analysis functions
+source('atrf.R')
 
 # TODO: Generate data based on analysis object definition?
 
-# Input data
+# Load analysis data from a spreadsheet
 suppressWarnings(library(readxl))
 anobs <- read_excel('../data/meta_analysis.xlsx')
 
@@ -36,16 +37,16 @@ Something about the context
 
 ```{r}
 # Initialize the analysis sequence
-anobj <- analysis('Analysis object', 'anobs')
+meta <- analysis('Analysis entity', 'anobs')
 
 # Generate the structure
-anobj <- grow(anobj, 'SEQUENCE', depth=2)
-anobj <- void(anobj, c('EDGE','VERTEX'))
+meta <- grow(meta, 'SEQUENCE', depth=2)
+meta <- void(meta, c('EDGE','VERTEX'))
 
-# Apply appropriate seed and partition
-anobj <- applySeed(sq=anobj, seed=163)
-anobj <- applyPartitioning(anobj, 'mbrp')
-anobj
+# Polish the output with appropriate seed and partition
+meta <- applySeed(sq=meta, seed=163)
+meta <- applyPartitioning(meta, 'mbrp')
+meta
 ```
 
 ## Detailed view
@@ -54,18 +55,20 @@ Something about detailed view
 
 ```{r}
 # Rearrange the structure
-anobj <- grow(anobj, 'GRAPH', depth=2, attrs=T, vals=T)
+meta <- grow(meta, 'GRAPH', depth=2, attrs=TRUE, vals=TRUE)
 
 # TODO: Workaround till attribute to link conversion done
-anobj <- void(sq=anobj, centers=c("GRAPH>vidx", "GRAPH>eidx"))
+meta <- void(sq=meta, centers=c("GRAPH>vidx", "GRAPH>eidx"))
 
-# anobj <- void(anobj, c('REPORT','SEQUENCE','STORAGE'))
-anobj <- void(anobj, c('REPORT','STORAGE'))
-anobj <- applySeed(sq=anobj, seed=99)
-anobj
+# meta <- void(meta, c('REPORT','SEQUENCE','STORAGE'))
+meta <- void(meta, c('REPORT','STORAGE'))
 
-# anobj <- applyAlternation(anobj)
-#anobj
+# Polish the output with appropriate seed 
+meta <- applySeed(sq=meta, seed=225)
+meta
+
+# meta <- applyAlternation(meta)
+#meta
 ```
 
 ## Analysis object final view [CKPT=Final]
@@ -74,53 +77,55 @@ To illustrate the timeline
 
 ```{r}
 
-#anobj <- voidCenter(anobj, c('REPORT','STORAGE'))
+#meta <- voidCenter(meta, c('REPORT','STORAGE'))
 
 ```
 
 ## Analysis object demos
 
 ```{r}
-#anobj <- applyTheme(anobj, 'minimalist')
-#anobj
+#meta <- applyTheme(meta, 'minimalist')
+#meta
 
-void(anobj, c('OBSERVATION','SEQUENCE'))
+void(meta, c('OBSERVATION','SEQUENCE'))
 
 # Grouping demo
-ganobj <- applySeed(anobj, 297)
+gmeta <- applySeed(meta, 297)
 gmbr <- c('GRAPH>seed', 'GRAPH>theme', 'GRAPH>layout')
-ganobj <- group(ganobj, 'GRAPH>mandatory', gmbr)
+gmeta <- group(gmeta, 'GRAPH>mandatory', gmbr)
 
 gmbr <- c('GRAPH>partitioning', 'GRAPH>alternation', 'GRAPH>vsizing', 'GRAPH>esizing', 'GRAPH>simplicity')
-ganobj <- group(ganobj, 'GRAPH>optional', gmbr)
+gmeta <- group(gmeta, 'GRAPH>optional', gmbr)
 
 gmbr <- c('GRAPH>scaling', 'GRAPH>symmetry', 'GRAPH>gradient')
 gname <- 'GRAPH>polishing'
-ganobj <- group(ganobj, gname, gmbr)
-ganobj
+gmeta <- group(gmeta, gname, gmbr)
+gmeta
 
-sanobj <- applySeed(anobj, 678)
-sanobj <- doScaling(sq=sanobj, scaling=3)
-sanobj
+smeta <- applySeed(meta, 678)
+smeta <- doScaling(sq=smeta, scaling=3)
+smeta
 
 # Add relevant details
-sizobj <- applySeed(anobj, 166)
+sizobj <- applySeed(meta, 166)
 sizobj <- applySizing(sizobj, method='wt')
 sizobj
 
 # Highlighting demo
-hlobj <- applySeed(anobj, 473)
+hlobj <- applySeed(meta, 473)
 hlobj <- applyHighlight(hlobj, c('GRAPH','SEQUENCE'))
 hlobj
 
-applyLayout(sq=anobj, layout="layout_on_grid")
+applyLayout(sq=meta, layout="layout_on_grid")
 
 # Finalise the sequence
-# signoff(anobj)
+# signoff(meta)
 ```
 
 # Dynamics
 ```{r}
+library(ggplot2)
+
 set.seed(3)
 
 n <- 9
