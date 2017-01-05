@@ -10,7 +10,7 @@ output:
     fig_width: 10
     highlight: tango
 ---
-Progression of the analysis has a certain structure. This stucture might contain trees, circles, loops, etc. Herein we limit the structure to a simple sequence
+Progression of the analysis has a certain structure. This stucture might contain trees, cirles, loops, etc. Herein we limit the structure to a simple sequence
 
 ## Observations
 
@@ -43,7 +43,7 @@ meta <- analysis('Analysis entity', 'anobs')
 meta <- grow(meta, 'SEQUENCE', depth=2)
 meta <- void(meta, c('EDGE','VERTEX'))
 
-# Polish the output with appropriate seed and partition
+# Polish the output with appropriate seed and partitioning
 meta <- applySeed(sq=meta, seed=163)
 meta <- applyPartitioning(meta, 'mbrp')
 meta
@@ -56,101 +56,253 @@ Something about detailed view
 ```{r}
 # Rearrange the structure
 meta <- grow(meta, 'GRAPH', depth=2, attrs=TRUE, vals=TRUE)
-
-# TODO: Workaround till attribute to link conversion done
-meta <- void(sq=meta, centers=c("GRAPH>vidx", "GRAPH>eidx"))
-
-# meta <- void(meta, c('REPORT','SEQUENCE','STORAGE'))
 meta <- void(meta, c('REPORT','STORAGE'))
 
 # Polish the output with appropriate seed 
-meta <- applySeed(sq=meta, seed=225)
+meta <- applySeed(sq=meta, seed=986)
 meta
-
-# meta <- applyAlternation(meta)
-#meta
 ```
 
-## Analysis object final view [CKPT=Final]
+## Transformation demos
 
-To illustrate the timeline
-
+### Center
 ```{r}
+# Source data (observations)
+sdata <- browseData(meta)
+sdata[sdata$objsrc=='EDGE', ]
 
-#meta <- voidCenter(meta, c('REPORT','STORAGE'))
+# Structure elements (target data)
+tdata <- getCenters(meta)
+tdata[tdata$name=='EDGE', ]
+
+tdata <- getRelations(meta)
+tdata[grepl('EDGE', tdata$name), ]
 
 ```
 
-## Analysis object demos
-
+### Grouping
 ```{r}
-#meta <- applyTheme(meta, 'minimalist')
-#meta
+# Group GRAPH optional attributes
+gmbr <- paste0('GRAPH>', c('sizing', 'sizing2', 'checkpoint',
+  'partitioning', 'partitioning2', 'alternation', 'simplicity'))
+gmeta <- group(meta, 'GRAPH>optional', gmbr)
 
-void(meta, c('OBSERVATION','SEQUENCE'))
+# Group VERTEX optional attributes
+gmbr <- paste0('VERTEX>', c('size',
+  'size2', 'membership', 'membership2', 'contrast'))
+gmeta <- group(gmeta, 'VERTEX>optional', gmbr)
 
-# Grouping demo
-gmeta <- applySeed(meta, 297)
-gmbr <- c('GRAPH>seed', 'GRAPH>theme', 'GRAPH>layout')
-gmeta <- group(gmeta, 'GRAPH>mandatory', gmbr)
+# Group EDGE optional attributes
+gmbr <- paste0('EDGE>', c('label', 'contrast'))
+gmeta <- group(gmeta, 'EDGE>optional', gmbr)
 
-gmbr <- c('GRAPH>partitioning', 'GRAPH>alternation', 'GRAPH>vsizing', 'GRAPH>esizing', 'GRAPH>simplicity')
-gmeta <- group(gmeta, 'GRAPH>optional', gmbr)
-
-gmbr <- c('GRAPH>scaling', 'GRAPH>symmetry', 'GRAPH>gradient')
-gname <- 'GRAPH>polishing'
-gmeta <- group(gmeta, gname, gmbr)
+# Apply appropriate seed and autoprint
+gmeta <- applySeed(gmeta, 181)
 gmeta
 
-smeta <- applySeed(meta, 678)
-smeta <- doScaling(sq=smeta, scaling=3)
-smeta
+```
 
-# Add relevant details
-sizobj <- applySeed(meta, 166)
-sizobj <- applySizing(sizobj, method='wt')
-sizobj
+# Embedding
+```{r}
+# Identify key steps
+summary(gmeta)
 
-# Highlighting demo
-hlobj <- applySeed(meta, 473)
-hlobj <- applyHighlight(hlobj, c('GRAPH','SEQUENCE'))
-hlobj
+# Finalize the grouping branch
+sqmain <- c('context', 'details', 'grouping')
+signoff(gmeta, thumb_seq=c(5, 8, 12), thumb_narr=sqmain)
+```
 
-applyLayout(sq=meta, layout="layout_on_grid")
+# Essential properties
 
-# Finalise the sequence
-# signoff(meta)
+### Randomization
+
+```{r}
+# Check for appropriate seed
+browseSeeds(meta)
+
+# Apply not so good seed
+meta <- applySeed(meta, 884)
+meta
+
+# Current randomization settings
+getSeed(meta)
+
+```
+
+## Layout
+```{r}
+# Check for appropriate layout (without partitioning as not always supported)
+meta <- removePartitioning(meta)
+browseLayouts(meta, plot=FALSE)
+browseLayouts(meta)
+
+# Apply an alternative layout
+meta <- applyLayout(sq=meta, layout='layout_with_lgl')
+meta
+
+# Current layout
+getLayout(meta)
+```
+
+## Theme
+```{r}
+# Check for available themes
+browseThemes(meta)
+
+# Try minimalist theme without adding to sequence
+applyTheme(meta, 'minimalist')
+
+# Current theme
+getTheme(meta)
+```
+
+# Optional properties
+
+## Partitioning
+```{r}
+meta <- applySeed(meta, 532)
+
+# Check clustering algorithms
+browsePartitionings(meta, plot=FALSE)
+browsePartitionings(meta)
+
+# Visualize pregiven communities 
+browseEntities(meta)[ ,c('object', 'mbrp')]
+
+# Use pregiven partitioning instead
+meta <- applyPartitioning(meta, 'mbrp')
+meta
+
+# Add another partitioning presentation
+meta <- applyPartitioning2(meta, 'mbrp')
+meta
+
+# Current partitioning
+getPartitionings(meta)
+
+```
+
+## Sizing
+
+```{r}
+# Function for size calculation
+psz <- function(ang) {
+  power_centrality(ang)
+}
+
+# Sizes calculated by custom function
+psz(meta[[length(meta)]])
+
+# Test sizes calculated by the function
+applySizing(meta, 'psz')
+
+# Pregiven sizes
+browseEntities(meta)[ ,c('object', 'wt')]
+
+# Apply pregiven sizes
+meta <- applySizing(meta, 'wt')
+meta
+
+# Current sizing
+getSizing(meta)
+```
+
+## Alternation
+```{r}
+# Apply alternation
+meta <- applyAlternation(meta)
+meta
+
+# Current alternation
+getAlternation(meta)
+
+# Remove alternation
+meta <- removeAlternation(meta)
+meta
+
+# Current alternation
+getAlternation(meta)
+```
+
+## Simplicity
+```{r}
+# Simple display of 10 biggest centers
+applySimplicity(meta, n=10)
+```
+
+# Polishing
+```{r}
+
+# Prepare for polishing
+meta <- applyLayout(meta, 'layout_with_fr')
+meta <- applySeed(meta, 776)
+meta
+
+# Try Scaling transformation
+doScaling(meta, scaling=3)
+
+# Average number of attributes
+c <- getCenters(meta)
+nrow(c[c$type=='attribute', ])/nrow(c[c$type=='entity', ])
+
+# Try Symmetry transformation
+doSymmetry(meta)
+
+# Initiate Gradient transformation from SEQUENCE entity
+meta <- doGradients(meta, 'SEQUENCE')
+meta <- applyAlternation(meta)
+meta
+```
+
+# Highlighting
+```{r}
+# Vertice coloring by membership prevents highlighting 
+meta <- removePartitioning2(meta)
+
+# Highlight link attributes
+ida <- grep('id', getCenters(meta)$name, value=TRUE)
+meta <- applyHighlight(meta, ida)
+
+meta
+
 ```
 
 # Dynamics
 ```{r}
-library(ggplot2)
-
+# Facilitate reproducibility
 set.seed(3)
 
+# Generate sequences of 9 steps
 n <- 9
 steps <- 1:n
 
+# Simulate the assembly sequence
 asm <- unlist(lapply(steps, function(x) {
   rep(x, x + 1 + abs(rnorm(1, 0, 2)))
 }))
-df <- data.frame(cbind(type=rep('assembly', length(asm)), count=asm))
+s <- data.frame(cbind(type=rep('assembly', length(asm)), count=asm))
 
+# Simulate the differentiation sequence
 dif <- unlist(lapply(steps, function(x) {
-  rep(x,  n * (n - x+ abs(rnorm(1, 0, 2))))
+  rep(x,  n * (n - x + abs(rnorm(1, 0, 2))))
 }))
-df <- rbind(df, cbind(type=rep('differentiation', length(dif)), count=dif))
+s <- rbind(s, cbind(type=rep('differentiation', length(dif)), count=dif))
 
-p <- ggplot(df, aes(x=count, fill=type))
-p <- p + stat_count(width=0.5, position='dodge')
-p <- p + theme(legend.position=c(1,1), legend.justification=c(1.1,1))
-p <- p + labs(x='Steps', y='Number of Centers')
-p <- p + geom_vline(aes(xintercept=0.5), color='darkblue', linetype='dotted', size=1)
-p <- p + geom_text(aes(x=0.5, label='baseline', y=100), hjust = -0.1, color='darkblue')
-p <- p + geom_vline(aes(xintercept=3.5), color='darkblue', linetype='dotted', size=1)
-p <- p + geom_text(aes(x=3.5, label='checkpoint 1', y=100), hjust = -0.1, color='darkblue')
-p <- p + geom_vline(aes(xintercept=5.5, label='ckpt2'), color='darkblue', linetype='dotted', size=1)
-p <- p + geom_text(aes(x=5.5, label='checkpoint 2', y=100), hjust = -0.1, color='darkblue')
-p
+# Output using ggplot2 graphics system
+library(ggplot2)
+col <-'darkblue'
+lt <- 'dashed'
+
+# Build the barplot
+ggplot(s, aes(x=count, fill=type)) + stat_count(width=0.8, position='dodge') +
+  labs(x='steps', y='number of centers') + theme_grey(base_size=16) +
+  theme(legend.position="top", legend.text=element_text(size=16)) +
+
+  # Add checkpoints
+  geom_vline(aes(xintercept=0.5), color=col, linetype=lt, size=1) +
+  geom_text(aes(x=0.5, label='baseline', y=100), hjust=-0.1, color=col, size=5) +
+  geom_vline(aes(xintercept=3.5), color=col, linetype=lt, size=1) +
+  geom_text(aes(x=3.5, label='checkpoint 1', y=100), hjust=-0.1, color=col, size=5) +
+  geom_vline(aes(xintercept=5.5), color=col, linetype=lt, size=1) +
+  geom_text(aes(x=5.5, label='checkpoint 2', y=100), hjust=-0.1, color=col, size=5)
 ```
-

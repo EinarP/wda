@@ -1,11 +1,11 @@
 ---
 title: "Overview"
 output:
+  html_document: default
   word_document:
     fig_height: 8
     fig_width: 12
     highlight: tango
-  html_document: default
 ---
 Frequenty there is a need to replace multiple systems with one new system or replace older version of the system with newer version but vendor supported upgrade is not possible. We call this process migration and illustrate below based on a particular instance of moving from significantly older version of the core banking system to a newer version
 

@@ -1,11 +1,11 @@
 ---
 title: "Overview"
 output:
-  word_document: 
+  html_document: default
+  word_document:
     fig_height: 12
     fig_width: 8
     highlight: tango
-  html_document: default
 ---
 It is not unusual for a professional to find herself facing a new complex software system and to be expected to make sense of it quickly. There may be a lot of documentation to go through and relevant training sessions, but self-exploring can complement this very well.
 

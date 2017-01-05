@@ -54,23 +54,23 @@ analysis <- function(name, datarefl=NULL, datarefw=NULL, ...) {
   assign(datarefw, obsw, envir=.GlobalEnv)
   
   # Empty graph with default settings  
-  ang <- set_trsq_attr(graph.empty(), match.call(),
+  ang <- set_asq_attr(graph.empty(), match.call(),
 
     # Generic (sequence or multi-step) metadata
     name=name, data=datarefw, checkpoint=NA, output='plot',
 
     # Global properties with no default value
-    partitioning=NA, partitioning2=NA, scaling=NA, symmetry=NA,
-    sizing=NA, sizing2=NA, layout=NA, 
+    layout=NA, partitioning=NA, partitioning2=NA,
+    sizing=NA, sizing2=NA, simplicity=NA, 
 
     # Global properties with default value
     seed=1, theme='expressive', 
 
     # Global boolean properties
-    gradient=FALSE, alternation=FALSE, simplicity=FALSE, ...)
+    alternation=FALSE, ...)
 
   # Return a list comprised of an empty graph
-  structure(list(ang), class='trsq')
+  structure(list(ang), class='asq')
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -79,12 +79,12 @@ analysis <- function(name, datarefl=NULL, datarefw=NULL, ...) {
 trf <- function(sq, trans, cl, ...) {
   
   # Retrieve latest structure with updated attributes
-  curang <- set_trsq_attr(tail(sq, 1)[[1]], cl, ...)
+  curang <- set_asq_attr(tail(sq, 1)[[1]], cl, ...)
 
   # Call the transformation function
   trfang <- do.call(match.fun(trans), args=list(curang, ...))
  
-  # Updates after structural changes
+  # Updates after structural growth
   if (trans %in% c('center', 'alternation')) {
     if (!(is.na(trfang$partitioning) & is.na(trfang$partitioning2))) {
       trfang <- partitioning(trfang)
@@ -104,7 +104,7 @@ trf <- function(sq, trans, cl, ...) {
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Internal function for setting tranformation attributes
-set_trsq_attr <- function(ang, cl, ...) {
+set_asq_attr <- function(ang, cl, ...) {
   
   # Mandatory attributes
   ang$dtstamp <- Sys.time()
@@ -150,7 +150,7 @@ apply_checkpoint <- function(ang) {
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Return a summary table
-summary.trsq <- function(sq, all=FALSE, plot=FALSE) {
+summary.asq <- function(sq, all=FALSE, plot=FALSE) {
 
   # Convert sequence list to a data frame
   sumrows <- lapply(sq, function(ang) data.frame(get.graph.attribute(ang)))
@@ -172,7 +172,7 @@ summary.trsq <- function(sq, all=FALSE, plot=FALSE) {
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Sequence overview printing
-print.trsq <- function(sq, ...) {
+print.asq <- function(sq, ...) {
 
   ang <<- tail(sq, 1)[[1]]
 
@@ -192,7 +192,7 @@ print.trsq <- function(sq, ...) {
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Plot the analysis sequence
-plot.trsq <- function(sq, xlab=NULL, main=NULL, steps=NULL, ncol=2) {
+plot.asq <- function(sq, xlab=NULL, main=NULL, steps=NULL, ncol=2) {
   if (is.null(steps)) {
     plot_ang(tail(sq, 1)[[1]], xlab, main)
   } else {
@@ -263,20 +263,17 @@ plot_ang <- function(ang, xlab=NULL, main=NULL) {
   V(ang)[V(ang)$type=='attribute']$shape <- 'circle'
   V(ang)[V(ang)$type=='agroup']$shape <- 'fcircle' 
   
-  # TODO: Commented out for membership grouping
-#  V(ang)[V(ang)$contrast]$color <- thmopt$vertex_contrast_color
-
   V(ang)$frame.color <- thmopt$vertex_frame_color
   V(ang)[!V(ang)$type %in% c('egroup','agroup')]$frame.color <- NA
   V(ang)$frame.width <- thmopt$vertex_frame_width
     
   # Simplified/full presentation
   # TODO: Non-essential (sans names?, etc.) in the background?
-  if (ang$simplicity) {
+  if (!is.na(ang$simplicity)) {
     plopt <- c(plopt, edge.arrow.mode=0, vertex.label.cex=0.8)
     
     # TODO: Dynamic or parameterized determination of big enough criteria
-    namedsz <- 20
+    namedsz <- ang$simplicity
     if (length(V(ang)) > namedsz) {
       bigenough <- V(ang)[order(V(ang)$size, decreasing=TRUE)[namedsz]]$size
       for(idx in seq_along(V(ang))) {
@@ -292,7 +289,7 @@ plot_ang <- function(ang, xlab=NULL, main=NULL) {
   if (ang$theme == 'expressive') {
     if (is.na(ang$partitioning)) {
       
-    } else if (ang$simplicity) {
+    } else if (!is.na(ang$simplicity)) {
       mbrpn <- as.numeric(as.factor(membership(V(ang))))
       #palette <- colorRampPalette(c('yellow','brown'), alpha=0.8)
       #colrs <- palette(max(mbrpn))[mbrpn]
@@ -303,7 +300,7 @@ plot_ang <- function(ang, xlab=NULL, main=NULL) {
   if (ang$theme == 'minimalist') {
     if (is.na(ang$partitioning)) {
 
-    } else if (ang$simplicity) {
+    } else if (!is.na(ang$simplicity)) {
       mbrpn <- as.numeric(as.factor(membership(V(ang))))
       colrs <- gray.colors(max(mbrpn))[mbrpn]
       plopt <- c(plopt, vertex.color=list(colrs))
@@ -348,8 +345,11 @@ plot_ang <- function(ang, xlab=NULL, main=NULL) {
     V(ang)$color <- rainbow(nc)[as.factor(V(ang)$membership2)]
   }
   
+  # TODO: Commented out for membership grouping
+  V(ang)[as.logical(V(ang)$contrast)]$color <- thmopt$vertex_contrast_color
+  
   # Output a graph or a graph with community
-  if (is.na(ang$partitioning) | ang$simplicity) {
+  if (is.na(ang$partitioning) | !is.na(ang$simplicity)) {
       do.call(ang$output, c(list(ang), plopt))
   } else {
     mbrp <- V(ang)$membership
@@ -370,10 +370,16 @@ plot_ang <- function(ang, xlab=NULL, main=NULL) {
 # Output multiple plots
 multiplot <- function(x, ...) UseMethod('multiplot')
 
-multiplot.trsq <- function(sq, fun, items) {
+multiplot.asq <- function(sq, fun, items) {
   
-  nrows <- round(length(items)/3)
-  ncols <- ifelse(length(items) < 3, length(items), 3)
+  n <- length(items)
+  if (n < 5) {
+    nrows <- ifelse(n < 3, 1, 2)
+    ncols <- ifelse(n < 2, 1, 2)
+  } else {
+    nrows <- round(n/3)
+    ncols <- ifelse(n < 3, length(items), 3)
+  }
   par(mfrow=c(nrows,ncols), cex.lab=1, mar=c(4,1,1,1))
   
   for (item in items) {
@@ -388,7 +394,7 @@ multiplot.trsq <- function(sq, fun, items) {
 # Explore center candidates
 browseData <- function(sq, ckpt=NULL) {
   
-  if(class(sq)=='trsq') sq <- tail(sq, 1)[[1]]
+  if(class(sq)=='asq') sq <- tail(sq, 1)[[1]]
   
   obsw <- get(sq$data)
 
@@ -506,18 +512,25 @@ add_attributes <- function(ang, centers, vals=FALSE, atype='attribute') {
   if (nrow(attrspec)) {
     links <- getRelations(ang)
     apply(attrspec, 1, function(cattr) {
-      clinks <- links[grepl(paste0(cattr['objsrc'], '\\|'), links$name), ]
+      src <- cattr['objsrc']
+      clinks <- links[grepl(paste0(src, '\\|'), links$name), ]
       newattr <- unname(cattr['object'])
-      attrlink <- paste(cattr['objsrc'], newattr, sep='|')
+      attrlink <- paste(src, newattr, sep='|')
       if (!attrlink %in% clinks$name) {
-        if (!(tmpang$simplicity & cattr['objattr'] %in% clinks$label)) {
+        if (!(!is.na(tmpang$simplicity) & cattr['objattr'] %in% clinks$label)) {
           newlabel <- unname(cattr['objattr'])
           if (!newattr %in% V(ang)$name) {
-            aattr <- list(name=newattr, label=newlabel)
-            aattr <- c(aattr, type=atype, contrast=FALSE)
-            ang <<- add_vertices(tmpang, 1, attr=aattr)
-            tmpang <<- add_link(ang, cattr['objsrc'], newattr, etype='association')
-        }
+            
+            # Don't add if link exists
+            el <- get.edgelist(ang)
+            noLink <- sum(E(ang)$label==newlabel & el[ ,1]==src, na.rm=T) < 1
+            if (noLink | ang$alternation) {
+              aattr <- list(name=newattr, label=newlabel)
+              aattr <- c(aattr, type=atype, contrast=FALSE)
+              ang <<- add_vertices(tmpang, 1, attr=aattr)
+              tmpang <<- add_link(ang, src, newattr, etype='association')
+            }
+          }
         }
       }
       
@@ -584,6 +597,12 @@ add_link <- function(ang, vsrc, vdest, elabel=NA, etype='defined') {
       if (!is.element(linkname, attr(E(ang), 'vnames'))) {
         lattr <- c(lattr, label=elabel, arrow.mode=2)
         ang <- add.edges(ang, c(vsrc,vdest), attr=lattr)
+        
+        # Delete source attribute if present
+        srca <- paste(vsrc, elabel, sep='>')
+        if (srca %in% V(ang)$name) {
+          ang <- delete.vertices(ang, srca)
+        }
       }
     } 
   }
@@ -596,7 +615,7 @@ add_link <- function(ang, vsrc, vdest, elabel=NA, etype='defined') {
 # Retrieve current centers
 getCenters <- function(sq, ctype=NA) {
   
-  if (class(sq) == 'trsq') {
+  if (class(sq) == 'asq') {
     ang <- tail(sq, 1)[[1]]
   } else {
     ang <- sq
@@ -613,7 +632,7 @@ getCenters <- function(sq, ctype=NA) {
 # Retrieve current relationships
 getRelations <- function(sq) {
   
-  if(class(sq) == 'trsq') {
+  if(class(sq) == 'asq') {
     ang <- tail(sq, 1)[[1]]
   } else {
     ang <- sq
@@ -631,8 +650,9 @@ getRelations <- function(sq) {
 browsePartitionings <- function(sq, plot=TRUE, ...) {
   
   # Available algorithms
-  methods <- c('cluster_edge_betweenness','cluster_label_prop',
-     'cluster_infomap','cluster_optimal','cluster_spinglass','cluster_walktrap')  
+#  methods <- c('cluster_edge_betweenness','cluster_label_prop',
+  methods <- c('cluster_edge_betweenness',
+      'cluster_infomap','cluster_optimal','cluster_spinglass','cluster_walktrap')  
   
   # Plot or list algorithms
   if (plot) {
@@ -711,8 +731,13 @@ get_communities <- function(ang, method) {
 
 # Get current partitioning algorithm or source data
 getPartitionings <- function(sq) {
+  
   ang <- tail(sq, 1)[[1]]
-  c(ang$partitioning, ang$partitioning2) 
+  
+  p <- c(ang$partitioning, ang$partitioning2)
+  names(p) <- c('partitioning', 'partitioning2')
+  
+  p
 }
 
 ################################################################################
@@ -727,18 +752,12 @@ doScaling <- function(sq, scaling) {
 # TODO: Implement the function
 scale <- function(ang, ...) {
 
-  vl <- c("OBSERVATION>checkpoint","VERTEX>label","VERTEX>shape","VERTEX>type")
-  vl <- c(vl,"GRAPH>alternation","GRAPH>checkpoint","GRAPH>gradient","GRAPH>layout","GRAPH>scaling")
-  vl <- c(vl,"GRAPH>seed","GRAPH>simplicity","GRAPH>symmetry","GRAPH>theme","EDGE>type")
+  vl <- c("OBSERVATION>checkpoint","VERTEX>shape","VERTEX>type","VERTEX>contrast")
+  vl <- c(vl,"EDGE","VERTEX>membership2","VERTEX>size2")
+  vl <- c(vl,"GRAPH>alternation","GRAPH>checkpoint","GRAPH>partitioning2","GRAPH>sizing2")
+  vl <- c(vl,"GRAPH>seed","GRAPH>layout","GRAPH>simplicity","GRAPH>output","GRAPH>theme","EDGE>type")
 
   thevoid(ang, centers=vl)
-}
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-# TODO: Current scaling settings => obsolete?
-getScaling <- function(sq) {
-  tail(sq, 1)[[1]]$scaling
 }
 
 ################################################################################
@@ -759,14 +778,15 @@ removeAlternation <- function(sq) {
 alternation <- function(ang, ...) {
 
 # TODO: type property handling
-  
-  for(idx in seq_along(E(ang))) {  
+
+  if (ang$alternation) {
     
-    objsrc <- sub('\\|.*', '', attr(E(ang)[idx], 'vnames'))
-    objdest <- sub('.*\\|', '', attr(E(ang)[idx], 'vnames'))
+    for(idx in seq_along(E(ang))) {  
     
-    # Add new links and mark obsolete edges/vertices for deletion
-    if (ang$alternation) {
+      objsrc <- sub('\\|.*', '', attr(E(ang)[idx], 'vnames'))
+      objdest <- sub('.*\\|', '', attr(E(ang)[idx], 'vnames'))
+    
+      # Add new links and mark obsolete edges/vertices for deletion
       if (!grepl('>', attr(E(ang)[idx], 'vnames'))) {
         
         objlbl <- E(ang)[idx]$label
@@ -775,21 +795,21 @@ alternation <- function(ang, ...) {
         
         E(ang)[idx]$label <- 'DELETE'
       }
-    } else {
-      if (grepl('>', objsrc)) {
-      
-        objattr <- sub('.*>', '', objsrc)
-        newobjsrc <- sub('>.*', '', objsrc)
-        ang <- add_link(ang, newobjsrc, objdest, elabel=objattr)
-        
-        V(ang)[objsrc]$label <- 'DELETE'
-      }
     }
-  }
   
-  # Delete obsolete vertices and edges
-  ang <- delete.vertices(ang, which(V(ang)$label=='DELETE'))
-  ang <- delete.edges(ang, which(E(ang)$label=='DELETE'))
+    # Delete obsolete vertices and edges
+    ang <- delete.vertices(ang, which(V(ang)$label=='DELETE'))
+    ang <- delete.edges(ang, which(E(ang)$label=='DELETE'))
+  } else {
+    
+    el <- get.edgelist(ang)
+    el <- el[grep('>', el[ ,1]), ]
+    for(idx in 1:nrow(el)) {
+      src <- sub('>.*', '', el[idx,1])
+      label <- sub('.*>', '', el[idx,1])
+      ang <- add_link(ang, src, el[idx,2], elabel=label)
+    } 
+  }
   
   ang
 }
@@ -809,23 +829,19 @@ getAlternation <- function(sq) {
 # neighboring centers, etc.
 
 # User friendly transformation function call
-applySymmetry <- function(sq) {
+doSymmetry <- function(sq) {
   trf(sq, 'symmetry', cl=match.call())
 }
 
 symmetry <- function(ang, ...) {
  
-  tmpang <- ang
+#  vl <- c("VERTEX>shape","VERTEX>type","VERTEX>contrast")
+  vl <- c("GRAPH>alternation","GRAPH>checkpoint","GRAPH>partitioning2","GRAPH>sizing2")
+  vl <- c(vl,"GRAPH>seed","GRAPH>layout","GRAPH>simplicity","GRAPH>output","GRAPH>theme")
   
-  tmpang
+  thevoid(ang, centers=vl)
 }
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-# TODO: Get current symmerty settings => obsolete?
-getSymmetry <- function(sq) {
-  tail(sq, 1)[[1]]$symmetry
-}
 
 ################################################################################
 # SPACE transformations
@@ -858,8 +874,10 @@ sizing <- function(ang, ...) {
   ang
 }
 
-sizing_fun <- function(ang, ...) {
+sizing_fun <- function(ang, method, ...) {
 
+  sz <- do.call(method, args=list(ang))
+  ang <- set_vertex_attr(ang, 'size', value=sz)
     # Calculate sizes
     #  V(ang)$size <- sample(10:20, length(V(ang)), replace=TRUE)
     
@@ -868,11 +886,11 @@ sizing_fun <- function(ang, ...) {
     #tmpang <- alternation(ang, remove=TRUE)
     #tmpang <- void(tmpang, getAttributes(ang))
     
-    btw <- betweenness(ang) + 3
-    V(ang)$size <- btw
+ #   btw <- betweenness(ang) + 3
+#    V(ang)$size <- btw
     
-    E(ang)$width <- sample(1:5, length(E(ang)), replace=TRUE)
-    E(ang)$arrow.size <- E(ang)$width^2
+#    E(ang)$width <- sample(1:5, length(E(ang)), replace=TRUE)
+#    E(ang)$arrow.size <- E(ang)$width^2
 
 # Limit the range and maximum size
 #  maxsize <- max(V(ang)$size)
@@ -976,8 +994,15 @@ doGradients <- function(sq, center) {
 # Transformation function
 gradient <- function(ang, ...) {
 
-# TODO: Calculate gradient of every entity and adjust number of attributes accordingly
-  ang
+  c <- getCenters(meta)$name
+  
+  v <- grep('OBSERVATION>', c, value=T)
+  v <- c(v, grep('VERTEX>', c, value=T))
+  v <- c(v, grep('EDGE>', c, value=T))
+  v <- c(v,"GRAPH>alternation","GRAPH>checkpoint","GRAPH>partitioning2","GRAPH>sizing2")
+  v <- c(v,"GRAPH>seed","GRAPH>layout","GRAPH>simplicity","GRAPH>output","GRAPH>theme")
+  
+  thevoid(ang, centers=v)
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1041,13 +1066,22 @@ group_trf <- function(ang, ...) {
     gidx <- ifelse(V(ang)$name %in% grp_members, 'isgroupmember', V(ang)$name)
     
     gidxb <- gidx=='isgroupmember'
-    ang <- set_vertex_attr(ang, 'type', index=gidxb, value='egroup')
     ang <- set_vertex_attr(ang, 'name', index=gidxb, value=grp_name)
+    if (grepl('>', grp_members[1])) {
+      ang <- set_vertex_attr(ang, 'type', index=gidxb, value='agroup')
+      grp_label <- sub('.*>', '', grp_name)
+    } else {
+      ang <- set_vertex_attr(ang, 'type', index=gidxb, value='egroup')
+      ang <- set_vertex_attr(ang, 'label', index=gidxb, value=grp_name)
+      grp_label <- grp_name
+    }
+    ang <- set_vertex_attr(ang, 'label', index=gidxb, value=grp_label)
   } else {
     gidx <- get.vertex.attribute(ang, grp_attr)
     
     V(ang)$type <- 'egroup'
     V(ang)$name <- get.vertex.attribute(ang, grp_attr)
+    V(ang)$label <- get.vertex.attribute(ang, grp_attr)
   }
   
   # Contract the graph by grouping index
@@ -1055,20 +1089,29 @@ group_trf <- function(ang, ...) {
   
   # Tidy up the atrributes
   for (cur_attr in list.vertex.attributes(ang)) {
-    if (!cur_attr %in% c('size')) {
-      cur_attr_val <- gsub(',.*$', '', get.vertex.attribute(ang, cur_attr))
-      ang <- set_vertex_attr(ang, cur_attr, value=cur_attr_val)
-    } else {
-      sumsz <- sapply(V(ang)$size, function(x) {
+    
+    # Numeric attributes
+    if (cur_attr %in% c('size')) {
+      
+      cur_attr_val <- sapply(V(ang)$size, function(x) {
         sum(as.numeric(unlist(strsplit(gsub(' ', '', x), ','))))
       })
       ang <- delete_vertex_attr(ang, 'size')
-      V(ang)$size <- sumsz
+
+    # Boolean attributes
+    } else if (cur_attr %in% c('contrast')) {
+      
+      cur_attr_val <- gsub(',.*$', '', get.vertex.attribute(ang, cur_attr))
+      cur_attr_val <- ifelse(cur_attr_val=='TRUE', TRUE, FALSE)
+      
+    # Character attributes
+    } else {
+      cur_attr_val <- gsub(',.*$', '', get.vertex.attribute(ang, cur_attr))
     }
-  # TODO: Boolean attributes (e.g. contrast) handling
+    
+    ang <- set_vertex_attr(ang, cur_attr, value=cur_attr_val)
   }
-  V(ang)$label <- V(ang)$name
-  
+
   if (is.null(grp_attr)) {
     
     # Remove self-references
@@ -1084,54 +1127,6 @@ group_trf <- function(ang, ...) {
     # TODO: maintain edge attributes like labels
     ang <- simplify(ang, remove.loops=T)
   }
-  
-  ang
-}
-
-group_members <- function(ang, ...) {
-  
-  group <- list(...)$group
-  members <- list(...)$members
-  
-  if (grepl('>', members[1])) {
-
-    # TODO: Implement attribute grouping properly
-    ang <- add_attributes(ang, group, atype='agroup')
-    ang <- delete.vertices(ang, match(members, V(ang)$name))
-  } else {
-    
-    gidx <- factor(ifelse(V(ang)$name %in% members, 'groupthis', V(ang)$name))
-    
-    gidx <- 1:len(V(ang)) ; vidx <- 2
-    for (idx in seq_along(V(ang))) {
-      if (V(ang)[idx]$name %in% members) {
-        gidx[idx] <- 1
-      } else {
-        gidx[idx] <- 1
-      }
-    }
-    
-    # TODO: Implement entity grouping
-    ang <- contract(ang, as.factor(V(ang)$membership2), vertex.attr.comb=toString)
-    
-    V(ang)$type <- 'egroup'
-    V(ang)$group <- V(ang)$name
-    V(ang)$membership2 <- gsub(',.*$', '', V(ang)$membership2)
-    V(ang)$name <- V(ang)$membership2
-    V(ang)$label <- V(ang)$membership2
-    V(ang)$contrast <- FALSE
-    
-    sumsz <- sapply(V(ang)$size, function(x) {
-      sum(as.numeric(unlist(strsplit(gsub(' ', '', x), ','))))
-    })
-    ang <- delete_vertex_attr(ang, 'size')
-    V(ang)$size <- sumsz
-    
-    # TODO: maintain edge attributes like labels
-    ang <- simplify(ang, remove.loops=T)
-    
-    ang
-  } 
   
   ang
 }
@@ -1343,13 +1338,13 @@ getLayout <- function(sq, ...) {
 # TODO: Instead TRUE/FALSE number of displayed labels?
 
 # User-friendly function call for setting simplified presentation mode
-applySimplicity <- function(sq, ...) {
-  trf(sq, 'simplicity', simplicity=TRUE, cl=match.call(), ...)  
+applySimplicity <- function(sq, n, ...) {
+  trf(sq, 'simplicity', simplicity=n, cl=match.call(), ...)  
 }
 
 # User-friendly function call for setting full presentation mode
 removeSimplicity <- function(sq, ...) {
-  trf(sq, 'simplicity', simplicity=FALSE, cl=match.call(), ...)
+  trf(sq, 'simplicity', simplicity=NA, cl=match.call(), ...)
 }
 
 # Transformation function
@@ -1400,7 +1395,8 @@ signoff <- function(sq, thumb_seq=NULL, thumb_narr=NULL, ...) {
   if (!is.null(thumb_seq)) {
 
     # TODO: Use checkpoints if thumb_narr not present
-    nc <- ifelse(length(thumb_seq)%%3==0, 3, 2)
+    n <- length(thumb_seq)
+    nc <- ifelse(n%%3==0 & n > 4, 3, 2)
     plot(sq, main=thumb_narr, steps=thumb_seq, ncol=nc)
   }
 
