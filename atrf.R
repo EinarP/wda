@@ -1,5 +1,6 @@
 
 # TODO: Split into smaller files somehow
+# TODO: Perhaps it deserves a better name
 
 suppressPackageStartupMessages(library(igraph))
 
@@ -128,6 +129,8 @@ set_asq_attr <- function(ang, cl, ...) {
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Adjust the structure to match the current checkpoint
+# TODO: Obsolete?
+
 apply_checkpoint <- function(ang) {
   
   ckptobs <- browseData(ang)

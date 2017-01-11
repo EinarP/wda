@@ -290,8 +290,10 @@ s <- rbind(s, cbind(type=rep('differentiation', length(dif)), count=dif))
 
 # Output using ggplot2 graphics system
 library(ggplot2)
+
 col <-'darkblue'
 lt <- 'dashed'
+ckpt <- c('baseline', 'checkpoint 1', 'checkpoint 2')
 
 # Build the barplot
 ggplot(s, aes(x=count, fill=type)) + stat_count(width=0.8, position='dodge') +
@@ -300,9 +302,9 @@ ggplot(s, aes(x=count, fill=type)) + stat_count(width=0.8, position='dodge') +
 
   # Add checkpoints
   geom_vline(aes(xintercept=0.5), color=col, linetype=lt, size=1) +
-  geom_text(aes(x=0.5, label='baseline', y=100), hjust=-0.1, color=col, size=5) +
+  geom_text(aes(x=0.5, label=ckpt[1], y=100), hjust=-0.1, color=col, size=5) +
   geom_vline(aes(xintercept=3.5), color=col, linetype=lt, size=1) +
-  geom_text(aes(x=3.5, label='checkpoint 1', y=100), hjust=-0.1, color=col, size=5) +
+  geom_text(aes(x=3.5, label=ckpt[2], y=100), hjust=-0.1, color=col, size=5) +
   geom_vline(aes(xintercept=5.5), color=col, linetype=lt, size=1) +
-  geom_text(aes(x=5.5, label='checkpoint 2', y=100), hjust=-0.1, color=col, size=5)
+  geom_text(aes(x=5.5, label=ckpt[3], y=100), hjust=-0.1, color=col, size=5)
 ```
