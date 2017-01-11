@@ -1,6 +1,6 @@
 
 # TODO: Split into smaller files somehow
-# TODO: Perhaps it deserves a better name
+# TODO: Perhaps it deserves a better name (satrf?)
 
 suppressPackageStartupMessages(library(igraph))
 
