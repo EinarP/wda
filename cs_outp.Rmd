@@ -1,9 +1,9 @@
 ---
 title: "Case Study Data"
 output:
+  html_document: default
   word_document:
     highlight: tango
-  html_document: default
 ---
 We have run a data collection program in the test system. The program fetched the information on the system structure from relevant structure definition files (e.g. STANDARD.SELECTION, PGM.FILES) and took random samples from all the data files (up to 30 samples per file). The data observations have been loaded into a spreadsheet for initial correctness checking:
 
@@ -53,7 +53,7 @@ For making sense of the data is reasonable to convert it to a “wide format”.
 
 ```{r}
 # Load analysis functions and initialize the sequence
-source('atrf.R')
+source('strfa.R')
 t24 <- analysis('t24expl', 't24obs')
 
 # Retrieve the data in wide format

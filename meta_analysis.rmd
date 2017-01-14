@@ -1,13 +1,13 @@
 ---
 title: "meta"
 output:
-  word_document: 
-    fig_height: 10
-    fig_width: 8
-    highlight: tango
   html_document:
     fig_height: 8
     fig_width: 10
+    highlight: tango
+  word_document:
+    fig_height: 10
+    fig_width: 8
     highlight: tango
 ---
 Progression of the analysis has a certain structure. This stucture might contain trees, cirles, loops, etc. Herein we limit the structure to a simple sequence
@@ -16,7 +16,7 @@ Progression of the analysis has a certain structure. This stucture might contain
 
 ```{r message=FALSE}
 # Load common structural analysis functions
-source('atrf.R')
+source('strfa.R')
 
 # TODO: Generate data based on analysis object definition?
 

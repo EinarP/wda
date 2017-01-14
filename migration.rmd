@@ -17,7 +17,7 @@ suppressWarnings(library(readxl))
 mobsw <- read_excel('../data/migration.xlsx')
 
 # Load transformation functions and initiate the sequence
-source('atrf.R')
+source('strfa.R')
 mov <- analysis('Data Migration Overview', datarefw='mobsw')
 ```
 

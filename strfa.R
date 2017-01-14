@@ -1,6 +1,7 @@
 
 # TODO: Split into smaller files somehow
-# TODO: Perhaps it deserves a better name (satrf?)
+# TODO: Use highlighting in (partitioning, sizing, etc.) error handling
+# TODO: Non-igraph layouts: trees, timelines?
 
 suppressPackageStartupMessages(library(igraph))
 
@@ -649,6 +650,9 @@ getRelations <- function(sq) {
 # BOUNDARY transformations
 ################################################################################
 
+# TODO: Possibility to add legends (especially for partitioning2)
+# TODO: Grouped layout (see strfa page) for partitioning 2
+
 # Explore clustering algorithms
 browsePartitionings <- function(sq, plot=TRUE, ...) {
   
@@ -1256,6 +1260,7 @@ getTheme <- function(sq, ...) {
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# TODO: Paritioning colors handling
 
 get_plopt <- function(theme=NA) {
 
@@ -1353,7 +1358,7 @@ removeSimplicity <- function(sq, ...) {
 # Transformation function
 simplicity <- function(ang, ...) {
 
-  # TODO: Restore labels etc in removing simplicity  
+  # TODO: Restore labels, paritioning, etc in removing simplicity  
   ang
 }
 
