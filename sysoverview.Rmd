@@ -1,11 +1,11 @@
 ---
 title: "Overview"
 output:
-  html_document: default
   word_document:
     fig_height: 12
     fig_width: 8
     highlight: tango
+  html_document: default
 ---
 It is not unusual for a professional to find herself facing a new complex software system and to be expected to make sense of it quickly. There may be a lot of documentation to go through and relevant training sessions, but self-exploring can complement this very well.
 
@@ -17,7 +17,7 @@ suppressWarnings(library(readxl))
 tobs <- read_excel('../data/t24.xlsx')
 
 # Load transformation functions and start the sequence
-source('atrf.R')
+source('strfa.R')
 sov <- analysis('System Overview', 'tobs')
 ```
 
@@ -36,7 +36,7 @@ str(tobsw[ ,1:(ncol(tobsw)-3)], strict.width='cut', width=70)
 Our first attempt to explore the structure highlights the challenges in doing that. There are too many items too grasp
 
 ```{r}
-# Create a structure comprised of all centers
+# Create a structure comprised of all entities
 entities <- browseEntities(sov)$object
 sov <- grow(sov, entities, depth=0)
 # load('sov2.dat')

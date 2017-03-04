@@ -1,34 +1,44 @@
 ---
-title: "Generation"
+title: "Lending Product Comparison"
 output:
   html_document: default
   word_document: default
 ---
-This is the analysis of loan scheduling mechanisms
+This is the analysis/comparison of different loan scheduling mechanisms
+
+TODO: Part of word doc. Loans are quite complex financial instruments. Lifecycle in decades. Various possible events. Simplified coverage here
 
 Big questions: 
 -what is connected to what?
 -How relavant values change over time?
 -What causes values to change?
 
-## Context
+We have run the program to extract the structure from sample system into a csv file. We run it on each checkpoint, to capture the changes over time
+
+```{r}
+# Load analysis functions (TODO: still not happy with the name...)
+source('strfa.R')
+
+# Initialise the analysis sequence
+lsobs <- read.csv('../data/T24R10MB.csv', stringsAsFactors=FALSE, na.strings='')
+lsov <- analysis('Loan scheduling overview', 'lsobs')
+
+# Observations made
+str(lsobsw)
+```
+
+## Context/Baseline
 
 There are too many edges shown and most of them are not particularly useful in this context. Remove these and replace with connections based on record scan
 
 Two clusters linked with CUSTOMER
 
 ```{r message=FALSE}
-# Common functions
-source('func.R')
-
-# Initialise the analysis sequence
-lsobs <- read.csv('../data/t24mb.csv', stringsAsFactors=FALSE, na.strings='')
-lsov <- analysis('Loan scheduling overview', 'lsobs')
 
 # Initial center candidates
 initList <- c('LD.LOANS.AND.DEPOSITS', 'AA.ARRANGEMENT')
 lsov <- grow(lsov, initList, ckpt='baseline')
-lsov <- applyLayout(lsov, layout='layout_components')
+# lsov <- applyLayout(lsov, layout='layout_components')
 lsov
 
 # Remove irrelevant centers

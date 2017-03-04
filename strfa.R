@@ -1346,7 +1346,7 @@ getLayout <- function(sq, ...) {
 # TODO: Instead TRUE/FALSE number of displayed labels?
 
 # User-friendly function call for setting simplified presentation mode
-applySimplicity <- function(sq, n, ...) {
+applySimplicity <- function(sq, n=10, ...) {
   trf(sq, 'simplicity', simplicity=n, cl=match.call(), ...)  
 }
 
