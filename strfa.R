@@ -312,7 +312,7 @@ plot_ang <- function(ang, xlab=NULL, main=NULL) {
   }
   
   plopt <- c(plopt, layout=list(layout), 
-    vertex.label.family='sans', edge.label.family='sans', edge.arrow.size=0.3,
+    vertex.label.family='sans', edge.label.family='sans', edge.arrow.size=0.4,
     edge.label.cex=0.8, edge.curved=list(0.3*which_mutual(ang)))
   
   # TODO: cluster coloring
@@ -349,8 +349,10 @@ plot_ang <- function(ang, xlab=NULL, main=NULL) {
     V(ang)$color <- rainbow(nc)[as.factor(V(ang)$membership2)]
   }
   
-  # TODO: Commented out for membership grouping
-  V(ang)[as.logical(V(ang)$contrast)]$color <- thmopt$vertex_contrast_color
+  # Highlight
+  hl_idx <- as.logical(V(ang)$contrast)
+  V(ang)[hl_idx]$color <- thmopt$vertex_contrast_color
+  V(ang)[hl_idx]$label.cex <- thmopt$vertex_contrast_label_cex
   
   # Output a graph or a graph with community
   if (is.na(ang$partitioning) | !is.na(ang$simplicity)) {
@@ -359,9 +361,10 @@ plot_ang <- function(ang, xlab=NULL, main=NULL) {
     mbrp <- V(ang)$membership
     anp <- make_clusters(ang, as.numeric(factor(mbrp)))
 
-    # Testing
-    #  mark_col <- list(c("tan", "pink", "lightgray", "gray", "green"))
-    #  plopt <- c(plopt, mark.border=NA, mark.col=mark_col)
+    if (ang$theme == 'minimalist') {
+      plopt <- c(plopt, mark.border=NA, mark.col=list(c("gray95")))
+      plopt <- c(plopt, edge.color='black')
+    }
     
     # TODO: communities in tkplot using color
     plopt <- c(plopt, col=list(V(ang)$color))
@@ -514,6 +517,8 @@ add_attributes <- function(ang, centers, vals=FALSE, atype='attribute') {
   
   # Add all attributes if not already present
   if (nrow(attrspec)) {
+    
+    # TODO: No relations retrieved if center not already present
     links <- getRelations(ang)
     apply(attrspec, 1, function(cattr) {
       src <- cattr['objsrc']
@@ -1269,14 +1274,18 @@ get_plopt <- function(theme=NA) {
   } else {
     
     # Vertex color
-    vc <- switch(theme, minimalist='lightgrey', 'orange1')
-    vcc <- switch(theme, minimalist='grey', 'red')
-    plopt <- list(vertex_color=vc, vertex_contrast_color=vcc)
+    vc <- switch(theme, minimalist='grey', 'orange1')
+    plopt <- list(vertex_color=vc)
+    
+    # Highlight
+    vchl <- switch(theme, minimalist='red2', 'red')
+    
+    plopt <- c(plopt, vertex_contrast_color=vchl, vertex_contrast_label_cex=1.2)
 
     # TODO: Color for minimalist group frame
     
     # Vertex frame
-    vfc <- 'lightgrey'
+    vfc <- switch(theme, minimalist='grey60', 'lightgrey')
     vfw <- 5
     plopt <- c(plopt, vertex_frame_color=vfc, vertex_frame_width=vfw)
 
