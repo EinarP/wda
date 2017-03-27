@@ -22,7 +22,7 @@ source('strfa.R')
 
 # Load analysis data from a spreadsheet
 suppressWarnings(library(readxl))
-anobs <- read_excel('data/meta.xlsx')
+anobs <- read_excel('../data/meta_analysis.xlsx')
 
 # Structure of sample data
 str(anobs)

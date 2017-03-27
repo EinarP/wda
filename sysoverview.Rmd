@@ -49,22 +49,21 @@ Certainly not should all the entities be treated equally. We can try to identify
 # Pregiven sizing based on record counts
 sov <- applySizing(sov, 'wt_numrec')
 
-# Remove entities with zero records
-centers <- getCenters(sov)
-zeroCenters <- centers[centers$size==0,'name']
-sov <- void(sov, centers=zeroCenters)
-
 # Identify main centers
-sov <- applySimplicity(sov)
+sov <- applySimplicity(sov, n=25)
 sov
 ```
 
 Partitioning by module seems to bring some additional clarity, but not too much
 
 ```{r}
-# Group the entities by module
+# Remove entities with zero records
+centers <- getCenters(sov)
+zeroCenters <- centers[centers$size==0,'name']
+sov <- void(sov, centers=zeroCenters)
 
 # TODO: Would be great to see module elements clustered
+# Partition the entities by module
 sov <- applyPartitioning(sov, 'mbrp_module')
 sov
 ```
@@ -72,9 +71,8 @@ sov
 We can use partitioning for grouping the entities, which by preserving the numeric importance in summing the entities will give as already quite comprensive picture of the particular system
 
 ```{r}
+# Group by membership attribute
 sov <- group(sov, by='membership')
-
-# sov <- removePartitioning(sov)
 
 # Membership detection error analysis is not a concern
 errc <- c('ERR_NO_PRODUCT_IN_PGM.FILE', 'ERR_NOT_IN_PGM.FILE')
@@ -98,8 +96,8 @@ sov
 Finally, we can conclude the analysis by plotting the sequence of essential steps  
 
 ```{r}
-sqmain <- c('all entities', 'sizing applied', 'partitioning applied')
+sqmain <- c('all entities', 'sizing and simplifying', 'void and partitioning')
 sqmain <- c(sqmain, 'grouping and polishing')
-signoff(sov, thumb_seq=c(2, 5, 6, 10), thumb_narr=sqmain)
+signoff(sov, thumb_seq=c(2, 4, 6, 10), thumb_narr=sqmain)
 ```
 
