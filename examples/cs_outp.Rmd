@@ -5,7 +5,7 @@ output:
   word_document:
     highlight: tango
 ---
-We have run a data collection program in the test system. The program fetched the information on the system structure from relevant structure definition files (e.g. STANDARD.SELECTION, PGM.FILES) and took random samples from all the data files (up to 30 samples per file). The data observations have been loaded into a spreadsheet for initial correctness checking:
+We have run a data collection program in the test system. The program fetched the information on the system structure from relevant structure definition files (e.g. STANDARD.SELECTION, PGM.FILES) and took random samples from all data files (up to 30 samples per file). The data observations were loaded into a spreadsheet for initial correctness checking:
 
 ```{r}
 # Load data observations
@@ -35,7 +35,7 @@ for (idx in 1:nrow(t24obs)) {
 str(t24obs, strict.width='cut', width=70)
 
 ```
-It is impossible and wasteful to anticipate every possible property and statistic which might be needed in later analysis. Therefore, the observations were arranged in flexible object-property-value format. This time the following properties and samples were collected:
+Attempting to anticipate every possible property and statistic which might be needed in later analysis is both wasteful and unrealistic. Therefore, the observations were arranged in flexible object-property-value format. For case study analyses the following properties and samples were collected:
 
 ```{r}
 # Summary of object properties observed
@@ -49,7 +49,7 @@ print(as.data.frame(sobs), row.names=FALSE)
 
 ```
 
-For making sense of the data is reasonable to convert it to a “wide format”. Below this is achieved by using the helper functions developed for structural analysis and which will be discussed later. Please also note the total number of observations:
+For making sense of the data is reasonable to convert it to a “wide format”. Below this is achieved by using specifically developed helper functions which will be discussed later. Please also note the total number of observations:
 
 ```{r}
 # Load analysis functions and initialize the sequence
@@ -63,7 +63,7 @@ str(obsw, give.attr=FALSE, strict.width='cut', width=70)
 
 We will build a summary plot (a “dashboard”) to visualize the essential aspects of a particular system, consisting of five sub-plots.
 
-Firstly, modularization can provide us a first glimpse to the whole system. We will present the discovered modules in a barplot, each module's heigth reflecting the number of tables belonging to a module and width the record count. Logarithmic presentation of the latter should be considered, also we have skipped all the historical records (e.g. every contract change might be stored as a new record, thus in a lifetime the contract may have hundreds of copies). Distinction has been made between core tables (created by the vendor) and local tables. Here the volume of the latter is small, but the ratio may vary drastically between sites, depending on the customer wishes and the age of the system (older installations tend to have more local developments):
+Firstly, modularization can provide us a first glimpse to the whole system. We will present the discovered modules in a barplot, each module’s height reflecting the number of tables belonging to a module and width the record count. Logarithmic presentation of the latter should be considered, also we have skipped all the historical records (e.g. every contract change might be stored as a new record, thus in a lifetime the contract may have hundreds of copies). Distinction has been made between core tables (created by the vendor) and local tables. Here the volume of the latter is small, but the ratio may vary drastically between sites, depending on the customer wishes and the age of the system (older installations tend to have more local developments):
 
 ```{r}
 m <- obsw[!is.na(obsw$mbrp_module), ]
@@ -90,9 +90,9 @@ modp
 
 Number of records and attributes might be indicative metrics, but these can be also quite deceptive. The same can be said about the data size and completeness (fill rate) information. On the other hand, we could have utilized more advanced metrics like  diversity of values.
 
-Now we have prepared all the data for the summary plot:
+Now we have prepared all the data for the summary plot (some formatting code will be omitted):
 
-```{r}
+```{r echo=FALSE}
 # Plot parameters
 par(mar=c(4,4,3,1), oma=c(1,1,2,0), cex.lab=1)
 layout(matrix(c(1,2,4,1,3,5), nrow=3))

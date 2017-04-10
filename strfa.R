@@ -42,12 +42,18 @@ analysis <- function(name, datarefl=NULL, datarefw=NULL, ...) {
     obsw <- get(datarefw)
   }
 
-  # Append helper columns
-  objsplit <- strsplit(sub('\\|', '>', obsw$object), '>', fixed=TRUE)
-  obsw$objsrc <- sapply(objsplit, function(x) x[1])
-  obsw$objattr <- sapply(objsplit, function(x) x[2])
-  obsw$objdest <- sapply(objsplit, function(x) x[3])
-  
+  # Append helper columns (with dummy attribute if needed)
+  hc <- sapply(obsw$object, function(x) {
+    if (grepl('|', x) & !grepl('>', x))
+      sub('\\|', sub('\\|', '_', paste0('>.', x, '>')), x)
+    else
+      sub('\\|', '>', x)
+  })
+  hc <- strsplit(hc, '>', fixed=TRUE)
+  obsw$objsrc <- sapply(hc, function(x) x[1])
+  obsw$objattr <- sapply(hc, function(x) x[2])
+  obsw$objdest <- sapply(hc, function(x) x[3])
+
   # Tidy up
   names(obsw) <- gsub('value.', '', names(obsw))
   obsw <- obsw[with(obsw, order(object, checkpoint)), ]
@@ -287,6 +293,8 @@ plot_ang <- function(ang, xlab=NULL, main=NULL) {
       }
       E(ang)$label <- NA
     }
+  } else {
+    E(ang)$label <- ifelse(substring(E(ang)$label, 1, 1) == '.', NA, E(ang)$label)
   }
   
   # Apply theme
