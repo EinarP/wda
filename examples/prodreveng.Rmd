@@ -1,0 +1,135 @@
+---
+title: "Product Reverse Engineering"
+output: html_document
+---
+
+```{r echo=FALSE}
+suppressPackageStartupMessages(suppressWarnings(library(zoo)))
+suppressWarnings(library(ggplot2))
+suppressWarnings(library(readxl))
+
+source('../strfa/strfa.R')
+
+# Structure definitions
+fobs <- read_excel('../data/fdb.xlsx', sheet='def')
+```
+
+# Question
+*After investing all the money which is not necessary for a pleasant lifestyle, when can I expect to have a portfolio which could indefinitely (till singularity) provide me with withdrawals similar to Estonian average salary?*
+
+# Source data
+```{r} 
+# Value if investments (perhaps derived from txns report later)
+gl <- read_excel('../data/fdb.xlsx', sheet='gl')
+
+# Fund plan transactions report
+fpt <- read_excel('../data/fdb.xlsx', sheet='fp_txn')
+
+```
+```{r echo=FALSE}
+obs_fields <- c('object', 'property', 'value', 'checkpoint')
+
+# Convert investment value data
+gl$object <- 'FUND_PLAN>inv_val'
+gl$property <- 'value'
+gl$value <- gl$fp_inv_val
+gl$checkpoint <- as.Date(as.yearmon(as.character(gl$month), '%Y%m'), frac=1)
+
+fobs <- subset(gl, value!=0 & checkpoint < Sys.Date(), obs_fields)
+
+# Convert cash flow data
+cf <- subset(fpt, grepl('osaline|Sissemakse', description) & !is.na(cashflow))
+cf <- cf[with(cf, order(date)), ]
+
+cf$object <- 'FUND_PLAN>cum_cash_flow'
+cf$property <- 'value'
+
+cf$cashflow <- as.numeric(gsub(',', '.', gsub("\\(.*$", "", cf$cashflow)))
+cf$cashflow <- ifelse(grepl('osaline', cf$description), -cf$cashflow, cf$cashflow)
+cf <- within(cf, value <- cumsum(cashflow))
+
+cf$checkpoint <- cf$date
+
+fobs <- rbind(fobs, cf[, obs_fields])
+fobs$checkpoint <- as.character(fobs$checkpoint)
+
+```
+
+After converting the data to observations in a long format:
+```{r}
+table(fobs$object)
+```
+```{r}
+fov <- analysis('Finances', datarefl='fobs')
+```
+
+# Portfolio value change over time
+
+```{r}
+grow(fov, 'FUND_PLAN', attrs=TRUE)
+
+p <- ggplot(data=fobs, aes(x=as.Date(checkpoint), y=value, colour=object))
+p + geom_point() + geom_line() + xlab('year')
+```
+
+*TODO: Calculate historical average monthly return (load historical monthly returns first)*
+
+```{r echo=FALSE}
+# TODO: This is probably already implemented by somebody somewhere
+fv <- function(pv, nper, r, pmt=0) {
+
+  fv <- pv
+  # TODO: Is for loop really unavoidable?
+  for (idx in 1:nper) fv <- fv*(1+r) + pmt
+  
+  fv
+}
+
+
+
+# fov <- grow(fov, 'ACCOUNT', ckpt='baseline')
+# fov <- applySizing(fov, 'value')
+# fov
+
+```
+
+## Performance optimisation
+
+```{r echo=FALSE}
+nm <- 8
+mlc <- 3000
+
+mth <- 1:nm
+inc <- c(rep(5000,5), rep(4000,3))
+outc <- rep(mlc,8)
+outc[7] <- mlc + 3000
+cf <- data.frame(cbind(mth, inc, outc))
+# cf
+
+# acbal <- V(ang)['ACCOUNT']$size
+
+# Amount to invest
+# invamt <- acbal + sum(cf$inc-cf$outc) - 3 * mlc
+#invamt
+
+# invamt/nm
+```
+
+
+```{r echo=FALSE}
+## Fund plan growth
+
+# rm <- 0.06/12
+# fp <- V(ang)['FUNDPLAN']$size
+# fp
+
+# Fund plan value by end of August 2017
+# fpfv <- round(fv(fp, nm, rm, pmt=2000))
+# round(c(fpfv, fpfv*rm))
+
+# Fund plan after ten years with 1k momthly placements
+# fpfv <- round(fv(fp, 120, rm, pmt=1000))
+# round(c(fpfv, fpfv*rm))
+
+```
+

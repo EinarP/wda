@@ -7,23 +7,21 @@ output:
     highlight: tango
   html_document: default
 ---
-It is not unusual for a professional to find herself facing a new complex software system and to be expected to make sense of it quickly. There may be a lot of documentation to go through and relevant training sessions, but self-exploring can complement this very well.
+It is quite common for a professional analyst to find him or herself facing a new complex software system and to be expected to make sense of it quickly. There may be a lot of documentation to go through and relevant training sessions, but self-study can complement this very well, as illustrated by this example
 
-We have created a program for extracing basic structural information about a particular T24 installation and will use this as a basis for our analysis
+We have used a dedicated program for extracting basic structural information from current T24 installation and loaded its output into a spreadsheet:
 
 ```{r message=FALSE}
 # Load observations
 suppressWarnings(library(readxl))
-tobs <- read_excel('../data/t24.xlsx')
+tobs <- read_excel('../../data/t24.xlsx')
 
 # Load transformation functions and start the sequence
-source('strfa.R')
+source('../strfa.R')
 sov <- analysis('System Overview', 'tobs')
 ```
 
-Light exploration on what not covered in case study exploratory analysis
-
-Note the number of observations and their content sampling
+It is convenient to collect the source data in a long format (in this analysis there are 86543 individual object-property-value observations in our disposal), but for analysis the data in a wide format (produduced by *analysis* function) is more suitable:
 
 ```{r message=FALSE}
 # Observations in a long format
@@ -33,7 +31,7 @@ str(tobs, strict.width='cut', width=70)
 str(tobsw[ ,1:(ncol(tobsw)-3)], strict.width='cut', width=70)
 ```
 
-Our first attempt to explore the structure highlights the challenges in doing that. There are too many items too grasp
+**Big picture.** Our first attempt to explore the structure highlights the challenges in doing that. There are just too many items to grasp:
 
 ```{r}
 # Create a structure comprised of all entities
@@ -43,7 +41,7 @@ sov <- grow(sov, entities, depth=0)
 sov
 ```
 
-Certainly not should all the entities be treated equally. We can try to identify what makes the difference based on some metric like e.g. size in bytes, connectedness, or completeness. Below a simplre record count (*wt_numrec*) is used for this purpose 
+**Sizing and Simplifying.** Not should all entities be treated equally.We can try to identify what makes the difference based on some metric like size in bytes, connectedness, or completeness. Below a simple record count *wt_numrec* is used for this purpose:
 
 ```{r}
 # Pregiven sizing based on record counts
@@ -54,7 +52,7 @@ sov <- applySimplicity(sov, n=25)
 sov
 ```
 
-Partitioning by module seems to bring some additional clarity, but not too much
+**Void and Partitioning.** Visualisation indicates that many entities have no connections defined. For more concrete analysis tasks, these can be discovered by scanning records for links. Also, it is quite common for a T24 installation to have a lot of tables created with no use. These can be filtered out and entities categorised by modules to which underlying tables are assigned to:
 
 ```{r}
 # Remove entities with zero records
@@ -68,7 +66,7 @@ sov <- applyPartitioning(sov, 'mbrp_module')
 sov
 ```
 
-We can use partitioning for grouping the entities, which by preserving the numeric importance in summing the entities will give as already quite comprensive picture of the particular system
+**Grouping.** Individual connections and relative positioning are too detailed in this context. We can make the display more compact by just grouping the entities by their membership and by preserving their numeric (sizing) importance. This gives us quite comprehensive overview of the system:
 
 ```{r}
 # Group by membership attribute
@@ -80,7 +78,7 @@ sov <- void(sov, centers=errc)
 sov
 ```
 
-Of course, the presentation can be improved by using different layout and randomizations
+**Polishing.** We can further elaborate the presentation by attempting to choose most suitable layout algorithm and experiment with randomization settings for the graph. Although for the latter, changing randomisation settings has little effect:
 
 ```{r}
 browseLayouts(sov)
@@ -93,7 +91,9 @@ sov <- applySeed(sov, 201)
 sov
 ```
 
-Finally, we can conclude the analysis by plotting the sequence of essential steps  
+**Concluding.** We seem to have a somewhat typical installation where the customer’s business is comprised mostly by lending products best handled by simple accounts (AC) with significant amount of custom local development (EB). We may also notice that built in reporting/accounting (RE) module is heavily utilised.
+
+To summarise, we plot the most characteristic sequence steps. We could have also chosen to store the analysis code and data for later retrieval:
 
 ```{r}
 sqmain <- c('all entities', 'sizing and simplifying', 'void and partitioning')

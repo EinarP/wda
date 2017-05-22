@@ -526,15 +526,15 @@ add_attributes <- function(ang, centers, vals=FALSE, atype='attribute') {
   # Add all attributes if not already present
   if (nrow(attrspec)) {
     
-    # TODO: No relations retrieved if center not already present
     links <- getRelations(ang)
     apply(attrspec, 1, function(cattr) {
       src <- cattr['objsrc']
-      clinks <- links[grepl(paste0(src, '\\|'), links$name), ]
+      anames <- links[grepl(paste0(src, '\\|'), links$name), 'name']
+      alabels <- links[grepl(paste0(src, '\\|'), links$name), 'label']
       newattr <- unname(cattr['object'])
       attrlink <- paste(src, newattr, sep='|')
-      if (!attrlink %in% clinks$name) {
-        if (!(!is.na(tmpang$simplicity) & cattr['objattr'] %in% clinks$label)) {
+      if (!attrlink %in% anames) {
+        if (!(!is.na(tmpang$simplicity) & cattr['objattr'] %in% alabels)) {
           newlabel <- unname(cattr['objattr'])
           if (!newattr %in% V(ang)$name) {
             
@@ -772,11 +772,11 @@ doScaling <- function(sq, scaling) {
 # TODO: Implement the function
 scale <- function(ang, ...) {
 
-  vl <- c("OBSERVATION>checkpoint","VERTEX>shape","VERTEX>type","VERTEX>contrast")
-  vl <- c(vl,"EDGE","VERTEX>membership2","VERTEX>size2")
-  vl <- c(vl,"GRAPH>alternation","GRAPH>checkpoint","GRAPH>partitioning2","GRAPH>sizing2")
-  vl <- c(vl,"GRAPH>seed","GRAPH>layout","GRAPH>simplicity","GRAPH>output","GRAPH>theme","EDGE>type")
-
+#  vl <- c("OBSERVATION>checkpoint","VERTEX>shape","VERTEX>type","VERTEX>contrast")
+#  vl <- c(vl,"EDGE","VERTEX>membership2","VERTEX>size2")
+#  vl <- c(vl,"GRAPH>alternation","GRAPH>checkpoint","GRAPH>partitioning2","GRAPH>sizing2")
+#  vl <- c(vl,"GRAPH>seed","GRAPH>layout","GRAPH>simplicity","GRAPH>output","GRAPH>theme","EDGE>type")
+  vl <- getCenters(meta)[V(ang)$size < 4,'name']
   thevoid(ang, centers=vl)
 }
 
@@ -856,8 +856,8 @@ doSymmetry <- function(sq) {
 symmetry <- function(ang, ...) {
  
 #  vl <- c("VERTEX>shape","VERTEX>type","VERTEX>contrast")
-  vl <- c("GRAPH>alternation","GRAPH>checkpoint","GRAPH>partitioning2","GRAPH>sizing2")
-  vl <- c(vl,"GRAPH>seed","GRAPH>layout","GRAPH>simplicity","GRAPH>output","GRAPH>theme")
+  vl <- c("GRAPH>alternation",'GRAPH>partitioning2',"GRAPH>sizing2")
+  vl <- c(vl,"GRAPH>output","GRAPH>theme")
   
   thevoid(ang, centers=vl)
 }
@@ -1015,12 +1015,18 @@ doGradients <- function(sq, center) {
 gradient <- function(ang, ...) {
 
   c <- getCenters(meta)$name
-  
+
+  # SEQUENCE  
+  #v <- grep('OBSERVATION>', c, value=T)
+  #v <- c(v, 'VERTEX>contrast', 'VERTEX>size2', 'VERTEX>type', 'VERTEX>shape', 'VERTEX>membership2', 'VERTEX>label')
+  #v <- c(v, 'EDGE>contrast', 'EDGE>type', 'EDGE>label')
+  #v <- c(v,"GRAPH>alternation","GRAPH>checkpoint","GRAPH>partitioning2","GRAPH>sizing2")
+  #v <- c(v,"GRAPH>seed","GRAPH>layout","GRAPH>simplicity","GRAPH>output","GRAPH>theme")
+ 
+  # GRAPH
   v <- grep('OBSERVATION>', c, value=T)
-  v <- c(v, grep('VERTEX>', c, value=T))
-  v <- c(v, grep('EDGE>', c, value=T))
-  v <- c(v,"GRAPH>alternation","GRAPH>checkpoint","GRAPH>partitioning2","GRAPH>sizing2")
-  v <- c(v,"GRAPH>seed","GRAPH>layout","GRAPH>simplicity","GRAPH>output","GRAPH>theme")
+  v <- c(v, 'VERTEX>contrast', 'VERTEX>size2', 'VERTEX>type', 'VERTEX>shape', 'VERTEX>membership2')
+  v <- c(v, 'EDGE>contrast', 'EDGE>type')
   
   thevoid(ang, centers=v)
 }
