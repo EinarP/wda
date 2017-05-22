@@ -14,8 +14,7 @@ source('../strfa/strfa.R')
 fobs <- read_excel('../data/fdb.xlsx', sheet='def')
 ```
 
-# Question
-*After investing all the money which is not necessary for a pleasant lifestyle, when can I expect to have a portfolio which could indefinitely (till singularity) provide me with withdrawals similar to Estonian average salary?*
+In particular we are interested in maximum expected return of the product
 
 # Source data
 ```{r} 
