@@ -17,11 +17,15 @@ We have run the program to extract the structure from sample system into a csv f
 
 ```{r}
 # Load analysis functions (TODO: still not happy with the name...)
-source('strfa.R')
+source('../strfa.R')
 
 # Initialise the analysis sequence
-lsobs <- read.csv('../data/T24R10MB.csv', stringsAsFactors=FALSE, na.strings='')
+suppressWarnings(library(readxl))
+lsobs <- read_excel('../data/lsov.xlsx', col_types = rep("text", 6))
+# lsobs <- read.csv('../data/lsov.csv', stringsAsFactors=FALSE, na.strings='')
 lsov <- analysis('Loan scheduling overview', 'lsobs')
+
+lsovbkp <- lsov
 
 # Observations made
 str(lsobsw)

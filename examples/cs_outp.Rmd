@@ -90,7 +90,7 @@ modp
 
 Number of records and attributes might be indicative metrics, but these can be also quite deceptive. The same can be said about the data size and completeness (fill rate) information. On the other hand, we could have utilized more advanced metrics like  diversity of values.
 
-Now we have prepared all the data for the summary plot (some formatting code will be omitted):
+Now we have prepared all the data for the summary plot (presented by omitting some of the formatting code):
 
 ```{r echo=FALSE}
 # Plot parameters
