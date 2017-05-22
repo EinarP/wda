@@ -1,13 +1,13 @@
 ---
 title: "meta"
 output:
-  html_document:
-    fig_height: 8
-    fig_width: 10
-    highlight: tango
   word_document:
     fig_height: 10
     fig_width: 8
+    highlight: tango
+  html_document:
+    fig_height: 8
+    fig_width: 10
     highlight: tango
 ---
 Progression of the analysis has a certain structure. This stucture might contain trees, cirles, loops, etc. Herein we limit the structure to a simple sequence
@@ -16,13 +16,13 @@ Progression of the analysis has a certain structure. This stucture might contain
 
 ```{r message=FALSE}
 # Load common structural analysis functions
-source('strfa.R')
+source('../strfa.R')
 
 # TODO: Generate data based on analysis object definition?
 
 # Load analysis data from a spreadsheet
 suppressWarnings(library(readxl))
-anobs <- read_excel('data/meta.xlsx')
+anobs <- read_excel('../data/meta.xlsx')
 
 # Structure of sample data
 str(anobs)
@@ -41,10 +41,9 @@ meta <- analysis('Analysis entity', 'anobs')
 
 # Generate the structure
 meta <- grow(meta, 'SEQUENCE', depth=2)
-meta <- void(meta, c('EDGE','VERTEX'))
 
-# Polish the output with appropriate seed and partitioning
-meta <- applySeed(sq=meta, seed=163)
+# Polish the output with appropriate seed and pcartitioning
+meta <- applySeed(sq=meta, seed=29)
 meta <- applyPartitioning(meta, 'mbrp')
 meta
 ```
@@ -56,10 +55,10 @@ Something about detailed view
 ```{r}
 # Rearrange the structure
 meta <- grow(meta, 'GRAPH', depth=2, attrs=TRUE, vals=TRUE)
-meta <- void(meta, c('REPORT','STORAGE'))
+meta <- void(meta, c('INFERENCE'))
 
 # Polish the output with appropriate seed 
-meta <- applySeed(sq=meta, seed=986)
+meta <- applySeed(sq=meta, seed=725)
 meta
 ```
 
@@ -109,7 +108,7 @@ summary(gmeta)
 
 # Finalize the grouping branch
 sqmain <- c('context', 'details', 'grouping')
-signoff(gmeta, thumb_seq=c(5, 8, 12), thumb_narr=sqmain)
+signoff(gmeta, thumb_seq=c(4, 7, 11), thumb_narr=sqmain)
 ```
 
 # Essential properties
@@ -121,7 +120,7 @@ signoff(gmeta, thumb_seq=c(5, 8, 12), thumb_narr=sqmain)
 browseSeeds(meta)
 
 # Apply not so good seed
-meta <- applySeed(meta, 884)
+meta <- applySeed(meta, 527)
 meta
 
 # Current randomization settings
@@ -137,7 +136,7 @@ browseLayouts(meta, plot=FALSE)
 browseLayouts(meta)
 
 # Apply an alternative layout
-meta <- applyLayout(sq=meta, layout='layout_with_lgl')
+meta <- applyLayout(sq=meta, layout='layout_with_kk')
 meta
 
 # Current layout
@@ -160,8 +159,6 @@ getTheme(meta)
 
 ## Partitioning
 ```{r}
-meta <- applySeed(meta, 532)
-
 # Check clustering algorithms
 browsePartitionings(meta, plot=FALSE)
 browsePartitionings(meta)
@@ -173,8 +170,8 @@ browseEntities(meta)[ ,c('object', 'mbrp')]
 meta <- applyPartitioning(meta, 'mbrp')
 meta
 
-# Add another partitioning presentation
-meta <- applyPartitioning2(meta, 'mbrp')
+# Add secondary partitioning
+meta <- applyPartitioning2(meta, 'tool_support')
 meta
 
 # Current partitioning
@@ -230,39 +227,41 @@ getAlternation(meta)
 applySimplicity(meta, n=10)
 ```
 
-# Polishing
+# Creating Order
 ```{r}
+# For ordering vertex membership and sizing form a basis
+getCenters(meta)[ ,c('name', 'membership', 'size')]
 
-# Prepare for polishing
-meta <- applyLayout(meta, 'layout_with_fr')
-meta <- applySeed(meta, 776)
+# Analysis graph before applying order creation transformations
 meta
 
 # Try Scaling transformation
 doScaling(meta, scaling=3)
 
 # Average number of attributes
-c <- getCenters(meta)
-nrow(c[c$type=='attribute', ])/nrow(c[c$type=='entity', ])
+vl <- getCenters(meta)[ ,c('name', 'membership', 'type')]
+lapply(unique(vl$membership), function(m) {
+  nent <- nrow(vl[vl$membership==m & vl$type=='entity', ])
+  nattr <- nrow(vl[vl$membership==m & vl$type=='attribute', ])
+  print(paste(m, 'mean number of attributes:', nattr/nent))}) -> NUL
 
 # Try Symmetry transformation
 doSymmetry(meta)
 
 # Initiate Gradient transformation from SEQUENCE entity
 meta <- doGradients(meta, 'SEQUENCE')
-meta <- applyAlternation(meta)
 meta
 ```
 
 # Highlighting
 ```{r}
-# Vertice coloring by membership prevents highlighting 
+# Vertex colouring by confuses highlighting  
 meta <- removePartitioning2(meta)
 
-# Highlight link attributes
-ida <- grep('id', getCenters(meta)$name, value=TRUE)
+# Highlight link attributes after applying alternation
+meta <- applyAlternation(meta)
+ida <- grep('>id|idx|step', getCenters(meta)$name, value=TRUE)
 meta <- applyHighlight(meta, ida)
-
 meta
 
 ```

@@ -1,11 +1,11 @@
 ---
 title: "Overview"
 output:
+  html_document: default
   word_document:
     fig_height: 12
     fig_width: 8
     highlight: tango
-  html_document: default
 ---
 It is quite common for a professional analyst to find him or herself facing a new complex software system and to be expected to make sense of it quickly. There may be a lot of documentation to go through and relevant training sessions, but self-study can complement this very well, as illustrated by this example
 
