@@ -12,55 +12,23 @@ suppressPackageStartupMessages(library(igraph))
 # Construct the transformations sequence object
 analysis <- function(name, datarefl=NULL, datarefw=NULL, ...) {
 
-  if (is.null(datarefw)) {
-    if (is.null(datarefl)) {
-      stop('Reference to data must be provided.')
-    } else {
-      obsl <- get(datarefl)
+  if (is.null(datarefl) & is.null(datarefw)) {
+    stop('Reference to data must be provided.')
+  }
   
-      # TODO: Separate function for long to wide transfers?
-      
-      # Tidy up checkpoints for reshaping
-      if (!is.element('checkpoint', names(obsl))) {
-        obsl$checkpoint <- 'all'
-      } else {
-        obsl[is.na(obsl$checkpoint),'checkpoint'] <- 'all'
-      }
-    
-      # Convert from long to wide format
-      obsl <- unique(obsl[ ,1:4])
-      obsw <- reshape(obsl, direction='wide',
-                    idvar=c('object','checkpoint'), timevar='property')
-    
-      # Convert weights to numeric
-      wtcol <- grep('wt_', names(obsw))
-      obsw[ ,wtcol] <- apply(obsw[ ,wtcol], 2, as.numeric)
-      
-      datarefw <- paste0(datarefl, 'w')
+  # Initialise or add data observations in a long format
+  if (!is.null(datarefl)) {
+    if (exists(datarefl)) {
+      add_obs('NEW', datarefl)
+    } else {
+      obsl <- data.frame(object=character(), property=character(),
+          value=character(), checkpoint=character(), stringsAsFactors=FALSE)
+
+      assign(datarefl, obsl, envir=.GlobalEnv)
     }
-  } else {
-    obsw <- get(datarefw)
+    datarefw <- paste0(datarefl, 'w')
   }
 
-  # Append helper columns (with dummy attribute if needed)
-  hc <- sapply(obsw$object, function(x) {
-    if (grepl('|', x) & !grepl('>', x))
-      sub('\\|', sub('\\|', '_', paste0('>.', x, '>')), x)
-    else
-      sub('\\|', '>', x)
-  })
-  hc <- strsplit(hc, '>', fixed=TRUE)
-  obsw$objsrc <- sapply(hc, function(x) x[1])
-  obsw$objattr <- sapply(hc, function(x) x[2])
-  obsw$objdest <- sapply(hc, function(x) x[3])
-
-  # Tidy up
-  names(obsw) <- gsub('value.', '', names(obsw))
-  obsw <- obsw[with(obsw, order(object, checkpoint)), ]
-
-  # Caching of long to wide transformation
-  assign(datarefw, obsw, envir=.GlobalEnv)
-  
   # Empty graph with default settings  
   ang <- set_asq_attr(graph.empty(), match.call(),
 
@@ -79,6 +47,70 @@ analysis <- function(name, datarefl=NULL, datarefw=NULL, ...) {
 
   # Return a list comprised of an empty graph
   structure(list(ang), class='asq')
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Add observations
+add_obs <- function(sq, new_obs) {
+
+  # Connect data sources
+  if (class(sq) == 'character') {
+    datarefl <- new_obs
+  } else {
+    ang <- tail(sq, 1)[[1]]
+    datarefl <- substr(ang$data, 1, nchar(ang$data)-1)
+  }
+  datarefw <- paste0(datarefl, 'w')
+  obsl <- get(datarefl)
+  
+  # Append to existing observations
+  if (class(sq) != 'character') {
+    if (is.list(new_obs) | is.matrix(new_obs) | is.data.frame(new_obs)) {
+      new_obs <- as.data.frame(new_obs, stringsAsFactors=FALSE)   
+  #    new_obs <- as.data.frame(new_obs)
+      if (ncol(new_obs) < 4) new_obs <- cbind(new_obs, rep(NA, nrow(new_obs)))
+      names(new_obs) <- c('object', 'property', 'value', 'checkpoint')
+      obsl <- rbind(obsl, new_obs)
+    } else {
+      stop('Unknown format for data observations.')
+    }
+  }
+
+  # Tidy up checkpoints for reshaping to wide format
+  if (!is.element('checkpoint', names(obsl))) {
+    obsl$checkpoint <- 'all'
+  } else {
+    obsl[is.na(obsl$checkpoint),'checkpoint'] <- 'all'
+  }
+  
+  # Convert from long to wide format
+  obsl <- unique(obsl[ ,1:4])
+  obsw <- reshape(obsl, direction='wide',
+      idvar=c('object','checkpoint'), timevar='property')
+  
+  # Convert weights to numeric
+  wtcol <- grep('wt_', names(obsw))
+  obsw[ ,wtcol] <- apply(obsw[ ,wtcol], 2, as.numeric)
+  
+  # Append helper columns (with dummy attribute if needed)
+  hc <- sapply(obsw$object, function(x) {
+    if (grepl('|', x) & !grepl('>', x))
+      sub('\\|', sub('\\|', '_', paste0('>.', x, '>')), x)
+    else
+      sub('\\|', '>', x)
+  })
+  hc <- strsplit(hc, '>', fixed=TRUE)
+  obsw$objsrc <- sapply(hc, function(x) x[1])
+  obsw$objattr <- sapply(hc, function(x) x[2])
+  obsw$objdest <- sapply(hc, function(x) x[3])
+  
+  # Tidy up
+  names(obsw) <- gsub('value.', '', names(obsw))
+  obsw <- obsw[with(obsw, order(object, checkpoint)), ]
+  
+  # Caching of long to wide transformation
+  assign(datarefl, obsl, envir=.GlobalEnv)
+  assign(datarefw, obsw, envir=.GlobalEnv)
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -143,7 +175,7 @@ apply_checkpoint <- function(ang) {
   ckptobs <- browseData(ang)
   
   # Remove vertices
-  cntr <- getCenters(ang)$name
+  cntr <- getElements(ang)$name
   ang <- thevoid(ang, centers=cntr[!(cntr %in% ckptobs$object)])
 
   # TODO: Adjust vertex values
@@ -449,8 +481,8 @@ browseRelations <- function(sq, ckpt=NULL) {
 # TODO: Introduce 'type' attr for differentiating entities and attributes
 
 # User friendly transformation function call
-grow <- function(sq, cntr, depth=1, attrs=FALSE, vals=FALSE, ckpt=NULL, ...) {
-  trf(sq, 'center', cl=match.call(), centers=cntr,
+grow <- function(sq, elems, depth=1, attrs=FALSE, vals=FALSE, ckpt=NULL, ...) {
+  trf(sq, 'center', cl=match.call(), elems=elems,
     depth=depth, attrs=attrs, vals=vals, checkpoint=ckpt, ...)
 }
 
@@ -465,7 +497,7 @@ center <- function(ang, ...) {
   aargs <- list(...)
   
   # Process the vector of center names
-  lapply(aargs$centers, function(x)
+  lapply(aargs$elems, function(x)
     add_entities(x, aargs$depth, attrs=aargs$attrs, vals=aargs$vals))
 
   # Return the updated graph
@@ -498,7 +530,7 @@ add_entities <- function(center, depth, attrs, vals) {
         }
         
         # TODO: Convert an attribute to a link if present
-        entities <- getCenters(tmpang, ctype='entity')$name
+        entities <- getElements(tmpang, ctype='entity')$name
         if (nextcenter %in% entities) {
           tmpang <<- add_link(tmpang, clnk['objsrc'],
             clnk['objdest'], elabel=clnk['objattr'], etype=clnk['type'])
@@ -630,7 +662,7 @@ add_link <- function(ang, vsrc, vdest, elabel=NA, etype='defined') {
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Retrieve current centers
-getCenters <- function(sq, ctype=NA) {
+getElements <- function(sq, ctype=NA) {
   
   if (class(sq) == 'asq') {
     ang <- tail(sq, 1)[[1]]
@@ -660,7 +692,7 @@ getRelations <- function(sq) {
 }
 
 ################################################################################
-# BOUNDARY transformations
+# MEMBERSHIP-PARTITIONING transformations
 ################################################################################
 
 # TODO: Possibility to add legends (especially for partitioning2)
@@ -707,10 +739,10 @@ partitioning <- function(ang, ...) {
 
   # TODO: Support grouping before setting the membership
   comm_idx <- V(ang)[V(ang)$type %in% c('entity', 'attribute')]
-  
+
   comm <- get_communities(ang, ang$partitioning)
   V(ang)$membership[comm_idx] <- comm[comm_idx]
- 
+
   # TODO: Not most efficient to always reapply both
   comm <- get_communities(ang, ang$partitioning2)
   V(ang)$membership2[comm_idx] <- comm[comm_idx]
@@ -732,16 +764,22 @@ get_communities <- function(ang, method) {
 
       # Use pregiven communities    
       obsw <- browseData(ang, 'all')
-  #    obsw <- get(ang$data)
-      comm <- obsw[!is.na(obsw[ ,method]), c('object',method)]
-      if (nrow(comm)) {
+      ocomm <- obsw[!is.na(obsw[ ,method]),c('object',method)]
+      if (nrow(ocomm)) {
+        
+        # Presume that only entities have membership defined
         ents <- sub('>.*', '', V(ang)$name)
-        comm <- comm[match(ents, comm$object),method]
+        comm <- ocomm[match(ents, ocomm$object),method]
+
+        # Some attributes may have membership defined as well     
+        ocomm <- ocomm[match(V(ang)$name, ocomm$object),method]
+        comm <- ifelse(is.na(ocomm), comm, ocomm)
       } else {
         stop('No memberships pregiven.')
       }
     }
     
+    # Avoid crashing if vertex without membership present
     comm[is.na(comm)] <- 'ERR'  
   }
   comm
@@ -776,7 +814,7 @@ scale <- function(ang, ...) {
 #  vl <- c(vl,"EDGE","VERTEX>membership2","VERTEX>size2")
 #  vl <- c(vl,"GRAPH>alternation","GRAPH>checkpoint","GRAPH>partitioning2","GRAPH>sizing2")
 #  vl <- c(vl,"GRAPH>seed","GRAPH>layout","GRAPH>simplicity","GRAPH>output","GRAPH>theme","EDGE>type")
-  vl <- getCenters(meta)[V(ang)$size < 4,'name']
+  vl <- getElements(meta)[V(ang)$size < 4,'name']
   thevoid(ang, centers=vl)
 }
 
@@ -1014,7 +1052,7 @@ doGradients <- function(sq, center) {
 # Transformation function
 gradient <- function(ang, ...) {
 
-  c <- getCenters(meta)$name
+  c <- getElements(meta)$name
 
   # SEQUENCE  
   #v <- grep('OBSERVATION>', c, value=T)
@@ -1046,18 +1084,18 @@ getGradient <- function(sq) {
 # TODO: Highlight links, values, perhaps even paths as well
 
 # User friendly transformation function call
-applyHighlight <-  function(sq, centers, ...) {
-  trf(sq, 'contrast', centers=centers, highlight=TRUE, cl=match.call())
+applyHighlight <-  function(sq, elems, ...) {
+  trf(sq, 'contrast', elems=elems, highlight=TRUE, cl=match.call())
 }
 
-removeHighlight <-  function(sq, centers, ...) {
-  trf(sq, 'contrast', centers=centers, highlight=FALSE, cl=match.call())
+removeHighlight <-  function(sq, elems, ...) {
+  trf(sq, 'contrast', elems=elems, highlight=FALSE, cl=match.call())
 }
 
 contrast <- function(ang, ...) {
   
-  centers <- list(...)$centers
-  hlc <- V(ang)$name %in% centers
+  elems <- list(...)$elems
+  hlc <- V(ang)$name %in% elems
   
   hl <- list(...)$highlight
   ang <- set_vertex_attr(ang, 'contrast', index=hlc, value=hl)
@@ -1146,8 +1184,7 @@ group_trf <- function(ang, ...) {
     
     # Grouped attribute labels ambigous
     el <- get.edgelist(ang)
-    E(ang)[el[ ,1]==grp_name]$label <- NA
-    E(ang)[el[ ,2]==grp_name]$label <- NA
+    E(ang)[el[ ,1]==grp_name]$label <- E(ang)[el[ ,2]==grp_name]$label <- NA
   } else {
     
     # TODO: maintain edge attributes like labels
