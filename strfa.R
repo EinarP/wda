@@ -51,6 +51,8 @@ analysis <- function(name, datarefl=NULL, datarefw=NULL, ...) {
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Add observations
+
+# TODO: Perhaps obs as R6 object. Or at least named sq_obsl abd sq_obsw
 add_obs <- function(sq, new_obs) {
 
   # Connect data sources

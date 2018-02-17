@@ -7,7 +7,7 @@ output:
 
 The analysed product (according to  description) targets investors who are willing semi-actively manage their portfolios and are interested in tax reliefs due its classification as a life insurance product (saving for retirement). 
 
-We are interested in maximum expected return of the product if the investor is having a long investment horizon and how it compares to investing into similar financial instruments directly.
+We are interested in expected return of the product if the investor is having a long investment horizon and how it compares to investing into similar financial instruments directly.
 
 Underlying asset performance and portfolio optimisation calculations will be done using functions from *PortfolioAnalytics* package. Data observations will be collected on the fly:
 
@@ -28,13 +28,11 @@ The product allows to combine a selection of fund shares (positions) into a port
 
 ```{r}
 # Observed that the product is comprised of positions in funds
-add_obs(fp, list('PRODUCT|contract_number>POSITION', 'type', 'defined'))
-add_obs(fp, list('FUND|id>POSITION', 'type', 'defined'))
 add_obs(fp, list(object=c('PRODUCT', 'POSITION', 'POSITION>units', 'FUND'),
   property=rep('mbrp', 4), value=rep('product', 4)))
 
-# Collected observations in a long format
-fpo
+add_obs(fp, list('PRODUCT|contract_number>POSITION', 'type', 'defined'))
+add_obs(fp, list('FUND|id>POSITION', 'type', 'defined'))
 
 # Load the table which lists funds available for the product
 FUND <- read_excel('../data/fp.xlsx', sheet='funds')
@@ -45,138 +43,124 @@ add_obs(fp, cbind(object=paste0('FUND>', names(FUND)),
   property=rep('mbrp', ncol(FUND)), value=rep('product', ncol(FUND))))
 
 # Visualise the product structure
-fp <- grow(fp, 'PRODUCT', depth=2, attrs=TRUE)
+fp <- grow(fp, 'POSITION', attrs=TRUE)
 fp
 ```
 
 # Performance
-Annualised returns are suitable performance measurements for this kind of product and long investment horizon. Historical net asset values are basis for performance calculations:
+Annualised returns are suitable performance measurements for this kind of product and long investment horizon. Historical net asset values are basis for performance calculations. Default performance as return of the portfolio comprised of all equally weighted assets:
 
 ```{r fig.height=8, fig.width=12}
 # Load fund value change data
-NAV_HIST <- read_excel('../data/fp.xlsx', sheet='prices')
-str(NAV_HIST)
+NAV <- read_excel('../data/fp.xlsx', sheet='prices')
 
 # Present as extended time series object for performance calculation functions
-nw <- reshape(NAV_HIST[ ,1:3], direction='wide', idvar=c('date'), timevar='ticker')
-NAV_HIST_wide <- xts(nw[, -1], order.by=as.Date(nw[ ,1], '%d.%m.%Y'))
-names(NAV_HIST_wide) <- gsub('nav.', '', names(NAV_HIST_wide))
+nw <- reshape(NAV[ ,1:3], direction='wide', idvar=c('date'), timevar='ticker')
+NAV_wide <- xts(nw[, -1], order.by=as.Date(nw[ ,1], '%d.%m.%Y'))
+names(NAV_wide) <- gsub('nav.', '', names(NAV_wide))
 
 # Populate NA with previous value
-NAV_HIST_wide <- na.locf(NAV_HIST_wide)
-tail(NAV_HIST_wide[ ,1:8])
+NAV_wide <- na.locf(NAV_wide)
 
 # Add historical prices to structure
-add_obs(fp, list('NAV_HIST', 'mbrp', 'performance'))
-add_obs(fp, list('FUND|id>NAV_HIST', 'type', 'defined'))
-add_obs(fp, cbind(object=paste0('NAV_HIST>', names(NAV_HIST)),
-  property=rep('mbrp', ncol(NAV_HIST)), value=rep('performance', ncol(NAV_HIST))))
+add_obs(fp, list('NAV', 'mbrp', 'performance'))
+add_obs(fp, list('FUND|id>NAV', 'type', 'defined'))
+add_obs(fp, cbind(object=paste0('NAV>', names(NAV)),
+  property=rep('mbrp', ncol(NAV)), value=rep('performance', ncol(NAV))))
 
-fp <- grow(fp, 'NAV_HIST', attrs=TRUE)
-
-# Separate product and perfomance calculation parts
-fp <- applyPartitioning2(fp, partitioning='mbrp')
-fp
-```
-
-## Default performance
-Return of the portfolio comprised of all equally weighted assets
-
-```{r fig.height=8, fig.width=12}
 # Daily returns
-fp_ret <- Return.calculate(NAV_HIST_wide)
+fp_ret <- Return.calculate(NAV_wide)
 
 # Annualised returns of years with sufficient data
-fund_ret_ann <- function(x) {
+ass_ret_ann <- function(x) {
   ifelse(sum(!is.na(x)) > 300, Return.annualized(x, scale=length(x)), NA)
 }
 
-fp_ret <- lapply(fp_ret, period.apply, endpoints(fp_ret, 'years'), fund_ret_ann)
+fp_ret <- lapply(fp_ret, period.apply, endpoints(fp_ret, 'years'), ass_ret_ann)
 fp_ret <- do.call(merge, fp_ret)
 
-# Remove funds with too few values
-fp_ret <- subset(fp_ret[2:(nrow(fp_ret)-1), ], select=-PCMAGOP)
+# Exclude assets and years with insufficient performance data
+drops <- colnames(fp_ret['2008',is.na(fp_ret['2008'])])
+FUND[FUND$ticker %in% drops, c('isin', 'name', 'ccy', 'ticker')]
 
-# Annulised returns of funds in descending order 
-fund_ret <- colMeans(fp_ret, na.rm=TRUE)
-fund_ret[order(fund_ret, decreasing=TRUE)]
+fp_ret <- fp_ret[ ,!(names(fp_ret) %in% drops)]
+fp_ret <- fp_ret[complete.cases(fp_ret), ]
 
-# Equally weighted portfolio return
-mean(fund_ret)
+# Annualised returns of funds in descending order 
+ass_ret <- colMeans(fp_ret)
+ass_ret <- ass_ret[order(ass_ret, decreasing=TRUE)] 
+round(ass_ret, 4)
 
-# Annulised returns corrected by asset management fee
-amfees <- FUND[match(names(fp_ret), FUND$ticker), 'amfee']/100
-amfees[is.na(amfees)] <- 0
+# Annualised standard deviations of equally weighted portfolio
+ass_sd <- StdDev(fp_ret)[1, ]
+ass_sd <- ass_sd[names(ass_ret)]
+round(ass_sd, 4)
 
-fp_ret_corr <- fp_ret - amfees
-fund_ret_corr <- colMeans(fp_ret_corr, na.rm=TRUE)
-fund_ret_corr[order(fund_ret_corr, decreasing=TRUE)]
+# Equally weighted portfolio mean historical return
+hist_ret <- mean(ass_ret)
+round(hist_ret, 4)
 
-# Equally weighted corrected portfolio return
-exp_ret_def <- mean(fund_ret_corr)
-exp_ret_def
+# Risk and return scatter plot
+chart.RiskReturnScatter(cbind(ass_ret, ass_sd), method='nocalc', add.sharpe=NA)
 
 # Stucture with attributes for performance analysis and default return
 add_obs(fp, list('FUND>return', 'mbrp', 'performance'))
-add_obs(fp, list('PRODUCT>expected_return', 'mbrp', 'performance'))
-add_obs(fp, list('PRODUCT>expected_return', 'value', round(exp_ret_def, 4)))
+add_obs(fp, list('FUND>risk', 'mbrp', 'performance'))
+add_obs(fp, list('PRODUCT>return', 'mbrp', 'performance'))
+add_obs(fp, list('PRODUCT>return', 'value', round(hist_ret, 4)))
+
+# Separate product and perfomance calculation parts
+fp <- applyPartitioning2(fp, partitioning='mbrp')
 fp <- grow(fp, 'FUND', depth=2, attrs=TRUE, vals=TRUE)
 fp
 ```
 
-# Optimised Product
+*TODO: Portfolio variance should be calculated as well?*
 
-*TODO: Different currencies? Regions? Bonds vs stocks vs commodities?*
+# Transactions
+From customer statements 9 types of possible transaction types were identified. Transactions affect positions and can be initiated either by the bank or the customer. We will skip analyses of some transaction types: inital conclusion fee, obsolete insurance risk premiums, possible dividend payments, and effect of widthrawals. Instead, we concentrate on more specific produduct management fee and purchase price margin analyses:
 
-*TODO: Checkpoint Performance as well?*
-
-*TODO: Sizing utilised to visualise value?*
-
-```{r fig.height=20}
-autoplot(fp_ret_corr)
-```
 ```{r fig.height=8, fig.width=12}
-# Create the portfolio specification
-port_spec <- portfolio.spec(colnames(fp_ret_corr))
+# Annualised returns corrected by asset management fee
+# amfees <- FUND[match(names(fp_ret), FUND$ticker), 'amfee']/100
+# amfees[is.na(amfees)] <- 0
 
-# Add a full investment constraint such that the weights sum to 1
-port_spec <- add.constraint(portfolio = port_spec, type = "full_investment")
+# fp_ret_corr <- fp_ret - amfees
+# ass_ret_corr <- colMeans(fp_ret_corr)
+#ass_ret_corr <- ass_ret_corr[order(-ass_ret_corr)]
 
-# Add a long only constraint such that the weight of an asset is between 0 and 1
-port_spec <- add.constraint(portfolio = port_spec, type = "long_only")
+# Product management fee deduction
+ass_ret_corr <- mean(ass_ret - mean(c(0.5, 0.75, 1, 1.25))/100)
+round(ass_ret_corr, 4)
 
-# Add an objective to minimize portfolio standard deviation
-# port_spec <- add.objective(portfolio = port_spec, type = "risk", name = "StdDev")
-port_spec <- add.objective(portfolio = port_spec, type = "return", name = "mean")
+# Transaction entiry with attributes
+txn <- paste0('TRANSACTION', c('', '>date', '>type', '>units'))
+add_obs(fp, list(object=txn, property=rep('mbrp', 4), value=rep('product', 4)))
 
-# Solve the optimization problem
-# opt <- optimize.portfolio(fp_ret_corr, portfolio = port_spec, optimize_method = "ROI")
-opt <- optimize.portfolio(fp_ret_corr, portfolio = port_spec)
+# add_obs(fp, list('FUND|id>TRANSACTION', 'type', 'defined'))
+add_obs(fp, list('POSITION|id>TRANSACTION', 'type', 'defined'))
 
-# StdDev.annualized(px_returns)
-# SharpeRatio.annualized(px_returns)
+fp <- grow(fp, 'TRANSACTION', attrs=TRUE)
+fp
+```
 
-# Stucture with attributes optimised performance
+Conclusions on analysed transactions and how these compare to direct purchasing of funds
+
+# Forecasting
+```{r fig.height=8, fig.width=12}
+add_obs(fp, list('PRODUCT>date', 'mbrp', 'performance'))
+add_obs(fp, list('PRODUCT>risk', 'mbrp', 'performance'))
 add_obs(fp, list('POSITION>weight', 'mbrp', 'performance'))
+
 fp <- grow(fp, 'POSITION', attrs=TRUE, vals=TRUE)
 fp
 ```
 
 
-# Performance Validation
-
-
-# Forecasting
-
-*TODO: Variance should be calculated as well?*
-
-# Transactions
-
-*TODO: Purchasing, selling fees? Taxes?*
-
 # Conclusions
 ```{r fig.height=10, fig.width=14}
-signoff(fp, thumb_seq=c(2, 4, 5))
+tn <- c('composisition', 'performance', 'transactions', 'forecasting')
+signoff(fp, thumb_seq=c(2, 4, 5, 6), thumb_narr=tn)
 ```
 
 # Discussion
@@ -185,3 +169,56 @@ Naïve analysis: Risk management
 Price history does not cover same periods, especially 2008/2009 financial crises
 
 *TODO: Would be nice to choose between partitioning2 colours*
+```{r eval=FALSE}
+# Optimised Product
+
+*TODO: Different currencies? Regions? Bonds vs stocks vs commodities?*
+
+*TODO: Checkpoint Performance as well?*
+
+*TODO: Sizing utilised to visualise value?*
+
+# Stucture with attributes optimised performance
+
+fp <- grow(fp, 'POSITION', attrs=TRUE, vals=TRUE)
+fp
+
+fig.height=20
+autoplot(fp_ret_corr)
+
+arc3 <- fp_ret_corr[ ,c("XMWO", "TEMTACU", "PIMGIIA")]
+FUND[FUND$ticker %in% colnames(arc3), c('ticker', 'name', 'ccy', 'sharpe', 'stdev')]
+
+library(tseries)
+portfolio.optim(arc3, pm=0.07)
+
+
+port_spec <- portfolio.spec(colnames(arc3))
+port_spec <- add.constraint(portfolio = port_spec, type = "full_investment")
+port_spec <- add.constraint(portfolio = port_spec, type = "long_only")
+port_spec <- add.constraint(portfolio = port_spec, type = "return", return_target = 0.07)
+
+port_spec <- add.objective(port_spec, type="return", name="mean")
+port_spec <- add.objective(port_spec, type="risk", name="StdDev")
+
+rp <- random_portfolios(port_spec, 100000, 'sample')
+optimize.portfolio(arc3, port_spec, optimize_method='random', rp=rp)
+
+# real opt
+port_spec <- portfolio.spec(colnames(fp_ret_corr))
+port_spec <- add.constraint(port_spec, type='full_investment')
+port_spec <- add.constraint(port_spec, type = "long_only")
+port_spec <- add.constraint(port_spec, type = "return", return_target = 0.07)
+port_spec <- add.constraint(port_spec, type="position_limit", max_pos=10)
+
+port_spec <- add.objective(port_spec, type="return", name="mean")
+port_spec <- add.objective(port_spec, type="risk", name="StdDev")
+#port_spec <- add.objective(port_spec, type="risk", name="StdDev", target=0.1)
+
+rp <- random_portfolios(port_spec, 100000, 'sample')
+optimize.portfolio(fp_ret_corr, port_spec, optimize_method = 'random', rp=rp)
+
+# optimize.portfolio(fp_ret_corr, portfolio = port_spec)
+
+```
+
