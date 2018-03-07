@@ -1,54 +1,93 @@
 ---
-title: "meta"
+title: "Wholistic Data Analysis Support Tool"
 output:
-  word_document:
-    fig_height: 10
-    fig_width: 8
-    highlight: tango
   html_document:
     fig_height: 8
     fig_width: 10
     highlight: tango
+    theme: journal
+  word_document:
+    fig_height: 10
+    fig_width: 8
+    highlight: tango
 ---
-Progression of the analysis has a certain structure. This stucture might contain trees, cirles, loops, etc. Herein we limit the structure to a simple sequence
+This document describes how to use the tool for supporting a wholistic data analysis process
+
+```{r echo = FALSE}
+suppressWarnings(suppressPackageStartupMessages(library(knitr)))
+```
+
+# About
+Wholistic data analysis is inspired by the work of architect Christopher Alexander and is presented in more detail elsewhere (*TODO: link*). This process would benefit enourmously from the availability of a support tool. Such tool as a collection of R functions is described below
+
+```{r}
+# TODO: First rename to wda, then split to multiple files and package
+source('../strfa.R')
+```
+
+# The Analysis Ecosystem
+In a nutshell, wholistic analysis means answering the research question (making inferences) by the sequence of wholeness-extending  transformations. The ecosystem for conducting such process is described below
 
 ## Observations
+Analyses are based on observations. These are data collected on object property values. Objects can be either entities or links between them. Hierarchy of entities can be specified by using '>' symbol to separate the levels. Links between entities contain linked entities separated with '|' symbol.
 
-```{r message=FALSE}
-# Load common structural analysis functions
-source('../strfa.R')
+Can be presented as a table in universal long format:
 
-# TODO: Generate data based on analysis object definition?
+```{r echo = FALSE}
+obsf <- data.frame(list(x = '*Definition*',
+  object = 'Entity or link between entities',
+  property = 'Value or meta  characteristic',
+  value = 'Property value',
+  checkpoint = 'Notional or temporal event of measuring',
+  source = 'Where the observation came from'))
+obsf <- rbind(obsf, data.frame(list(x = '*Example*',
+  object = 'levelx>group>entity>attribute',
+  property = 'value, type',
+  value = '10, numeric',
+  checkpoint = 'DISBURSEMENT, 2018-03-03T09:57:10',
+  source = 'gl, book reference')))
+kable(obsf)
+```
 
-# Load analysis data from a spreadsheet
+Compact presentation might be handy as well:
+
+*checkpoint:levelx>group>entity>attribute>property=value{source}*
+
+Observations can be assigned to a variable (like in a code snippet below) or added directly during any transformation
+
+```{r}
+# Load observations for the analysis from a spreadsheet
 suppressWarnings(library(readxl))
 anobs <- read_excel('../data/meta.xlsx')
 
-# Structure of sample data
+# Structure of sample observations
 str(anobs)
 
 # Summary of properties
 table(anobs$property)
 ```
 
-## Context
+## Sequence
+Progression of the analysis has a certain structure. Simple chain of incremental steps is preferable, but trees, cirles, loops, etc. are possible as well. Each step  corresponds to a most appropriate (wholeness-extending) transformation
 
-Something about the context
+Starts with *analysis* and ends with *signoff*
 
 ```{r}
+# TODO: Generate data based on analysis object definition?
+
 # Initialize the analysis sequence
-meta <- analysis('Analysis entity', 'anobs')
+meta <- analysis('Meta-analysis', obs = 'anobs')
 
 # Generate the structure
-meta <- grow(meta, 'SEQUENCE', depth=2)
+meta <- grow(meta, 'SEQUENCE', depth = 2)
 
-# Polish the output with appropriate seed and pcartitioning
-meta <- applySeed(sq=meta, seed=29)
-meta <- applyPartitioning(meta, 'mbrp')
+# Polish the output with appropriate seed and partitioning
+meta <- applySeed(sq = meta, seed = 29)
+# meta <- applyPartitioning(meta, 'mbrp')
 meta
 ```
 
-## Detailed view
+## Structural component
 
 Something about detailed view
 
@@ -62,7 +101,15 @@ meta <- applySeed(sq=meta, seed=725)
 meta
 ```
 
-## Transformation demos
+# Transformations
+
+*TODO: Summary table*
+
+Structure Generation
+Essential Global Properties
+Optional Global Properties
+Creating order
+Local Properties
 
 ### Center
 ```{r}
@@ -71,7 +118,7 @@ sdata <- browseData(meta)
 sdata[sdata$objsrc=='EDGE', ]
 
 # Structure elements (target data)
-tdata <- getCenters(meta)
+tdata <- getElements(meta)
 tdata[tdata$name=='EDGE', ]
 
 tdata <- getRelations(meta)
@@ -161,17 +208,17 @@ getTheme(meta)
 ```{r}
 # Check clustering algorithms
 browsePartitionings(meta, plot=FALSE)
-browsePartitionings(meta)
+#browsePartitionings(meta)
 
 # Visualize pregiven communities 
 browseEntities(meta)[ ,c('object', 'mbrp')]
 
 # Use pregiven partitioning instead
-meta <- applyPartitioning(meta, 'mbrp')
+#meta <- applyPartitioning(meta, 'mbrp')
 meta
 
 # Add secondary partitioning
-meta <- applyPartitioning2(meta, 'tool_support')
+#meta <- applyPartitioning2(meta, 'tool_support')
 meta
 
 # Current partitioning
@@ -230,7 +277,7 @@ applySimplicity(meta, n=10)
 # Creating Order
 ```{r}
 # For ordering vertex membership and sizing form a basis
-getCenters(meta)[ ,c('name', 'membership', 'size')]
+getElements(meta)[ ,c('name', 'membership', 'size')]
 
 # Analysis graph before applying order creation transformations
 meta
@@ -239,7 +286,7 @@ meta
 doScaling(meta, scaling=3)
 
 # Average number of attributes
-vl <- getCenters(meta)[ ,c('name', 'membership', 'type')]
+vl <- getElements(meta)[ ,c('name', 'membership', 'type')]
 lapply(unique(vl$membership), function(m) {
   nent <- nrow(vl[vl$membership==m & vl$type=='entity', ])
   nattr <- nrow(vl[vl$membership==m & vl$type=='attribute', ])
@@ -260,13 +307,14 @@ meta <- removePartitioning2(meta)
 
 # Highlight link attributes after applying alternation
 meta <- applyAlternation(meta)
-ida <- grep('>id|idx|step', getCenters(meta)$name, value=TRUE)
+ida <- grep('>id|idx|step', getElements(meta)$name, value=TRUE)
 meta <- applyHighlight(meta, ida)
 meta
 
 ```
 
 # Dynamics
+*TODO: Archive and remove*
 ```{r}
 # Facilitate reproducibility
 set.seed(3)

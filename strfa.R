@@ -4,72 +4,110 @@
 # TODO: Non-igraph layouts: trees, timelines?
 
 suppressPackageStartupMessages(library(igraph))
+suppressPackageStartupMessages(library(tidyr))
 
 ################################################################################
 # Analysis object and related methods
 ################################################################################
 
-# Construct the transformations sequence object
-analysis <- function(name, datarefl=NULL, datarefw=NULL, ...) {
+# Construct the transformation sequence object
+analysis <- function(name, obs = NULL, ckpt = NULL) {
+  
+  # Default sequence properties  
+  ang <- set_asq_attr(graph.empty(), match.call(),
+                      
+    # Generic (sequence or multi-step) metadata
+    name = name, data = NA, checkpoint = NA, output = 'plot',
+                      
+    # Global properties with no default value
+    layout = NA, partitioning = NA, partitioning2 = NA,
+    sizing = NA, sizing2 = NA, simplicity = NA, 
+                      
+    # Global properties with default value
+    seed = 1, theme = 'expressive', 
+                      
+    # Global boolean properties
+    alternation = FALSE
+  )
+  
+  # Initialise the sequence
+  sq <- structure(list(ang), class = 'asq')
+  trf(sq, 'init', cl = match.call(), obs = obs, checkpoint = ckpt)
+}
 
-  if (is.null(datarefl) & is.null(datarefw)) {
-    stop('Reference to data must be provided.')
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# Wrapper for transformations
+trf <- function(sq, trans, cl, ...) {
+
+  # Add observations
+  if (!is.null(sq_data <- list(...)$obs)) {
+    sq_data <- trf_obs(sq, sq_data, sq_name = as.character(cl[[2]]))
+  }
+
+  # TODO: New checkpoint processing
+  new_ckpt <- list(...)$checkpoint
+  
+  # Retrieve latest structure with updated attributes
+  curang <- set_asq_attr(tail(sq, 1)[[1]], cl, data = sq_data, ...)
+
+  # Perform the transformation
+  if (trans != 'init') {
+    
+    trfang <- do.call(match.fun(trans), args = list(curang, ...))
+    
+    # Updates after structural growth
+    if (trans %in% c('center', 'alternation')) {
+      if (!(is.na(trfang$partitioning) & is.na(trfang$partitioning2))) {
+        trfang <- partitioning(trfang)
+      }
+      if (!(is.na(trfang$sizing) & is.na(trfang$sizing2))) {
+        trfang <- sizing(trfang)
+      }
+    }
+    
+    # Expand the structure list
+    sq[[length(sq)+1]] <- trfang
+  } else {
+    
+    sq[[1]] <- curang
   }
   
-  # Initialise or add data observations in a long format
-  if (!is.null(datarefl)) {
-    if (exists(datarefl)) {
-      add_obs('NEW', datarefl)
-    } else {
-      obsl <- data.frame(object=character(), property=character(),
-          value=character(), checkpoint=character(), stringsAsFactors=FALSE)
-
-      assign(datarefl, obsl, envir=.GlobalEnv)
-    }
-    datarefw <- paste0(datarefl, 'w')
-  }
-
-  # Empty graph with default settings  
-  ang <- set_asq_attr(graph.empty(), match.call(),
-
-    # Generic (sequence or multi-step) metadata
-    name=name, data=datarefw, checkpoint=NA, output='plot',
-
-    # Global properties with no default value
-    layout=NA, partitioning=NA, partitioning2=NA,
-    sizing=NA, sizing2=NA, simplicity=NA, 
-
-    # Global properties with default value
-    seed=1, theme='expressive', 
-
-    # Global boolean properties
-    alternation=FALSE, ...)
-
-  # Return a list comprised of an empty graph
-  structure(list(ang), class='asq')
+  # Return the sequence  
+  sq
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Add observations
 
-# TODO: Perhaps obs as R6 object. Or at least named sq_obsl abd sq_obsw
-add_obs <- function(sq, new_obs) {
-
-  # Connect data sources
-  if (class(sq) == 'character') {
-    datarefl <- new_obs
-  } else {
-    ang <- tail(sq, 1)[[1]]
-    datarefl <- substr(ang$data, 1, nchar(ang$data)-1)
-  }
-  datarefw <- paste0(datarefl, 'w')
-  obsl <- get(datarefl)
+trf_obs <- function(sq, new_obs, sq_name) {
   
+  ang <- tail(sq, 1)[[1]]
+
+  # Connect the data source
+  if (class(new_obs) == 'character') {
+    data_long_ref <- new_obs
+  } else {
+    if (is.na(ang$data)) {
+      ang$data <- paste0(gsub(' ', '', sq_name), '_obs')
+    }
+    data_long_ref <- ang$data
+  }
+  
+  obsl <- get0(as.character(substitute(data_long_ref)))
+  
+  # if (is.null(obsl <- get0(as.character(substitute(data_long_ref))))) {
+  #  stop("Referenced data source does not exist.")
+  #}
+
+  # TODO: Necessary to convert to wide format all the time (if not fix browseDataTable as well)
+  data_wide_ref <- paste0(data_long_ref, '_wide')
+
   # Append to existing observations
-  if (class(sq) != 'character') {
+  if (class(new_obs) != 'character') {
     if (is.list(new_obs) | is.matrix(new_obs) | is.data.frame(new_obs)) {
       new_obs <- as.data.frame(new_obs, stringsAsFactors=FALSE)   
-  #    new_obs <- as.data.frame(new_obs)
+      #    new_obs <- as.data.frame(new_obs)
       if (ncol(new_obs) < 4) new_obs <- cbind(new_obs, rep(NA, nrow(new_obs)))
       names(new_obs) <- c('object', 'property', 'value', 'checkpoint')
       obsl <- rbind(obsl, new_obs)
@@ -77,7 +115,7 @@ add_obs <- function(sq, new_obs) {
       stop('Unknown format for data observations.')
     }
   }
-
+  
   # Tidy up checkpoints for reshaping to wide format
   if (!is.element('checkpoint', names(obsl))) {
     obsl$checkpoint <- 'all'
@@ -87,8 +125,9 @@ add_obs <- function(sq, new_obs) {
   
   # Convert from long to wide format
   obsl <- unique(obsl[ ,1:4])
-  obsw <- reshape(obsl, direction='wide',
-      idvar=c('object','checkpoint'), timevar='property')
+  # obsw <- reshape(obsl, direction='wide', idvar=c('object','checkpoint'), timevar='property')
+  
+  obsw <- spread(obsl, property, value)
   
   # Convert weights to numeric
   wtcol <- grep('wt_', names(obsw))
@@ -110,37 +149,52 @@ add_obs <- function(sq, new_obs) {
   names(obsw) <- gsub('value.', '', names(obsw))
   obsw <- obsw[with(obsw, order(object, checkpoint)), ]
   
-  # Caching of long to wide transformation
-  assign(datarefl, obsl, envir=.GlobalEnv)
-  assign(datarefw, obsw, envir=.GlobalEnv)
+  # Caching of long to wide transformation???
+  assign(data_long_ref, obsl, envir=.GlobalEnv)
+  assign(data_wide_ref, obsw, envir=.GlobalEnv)
+  
+  # Reference to a data source
+  data_long_ref
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Add observations
 
-# Wrapper for transformations
-trf <- function(sq, trans, cl, ...) {
+# TODO: Split to functions per type
+#  if (class(x) == 'character') {
+#  if (is.list(x) | is.matrix(x) | is.data.frame(x)) {
+
+as_obs <- function(x) {
+
+  new_obs <- as.data.frame(x, stringsAsFactors = FALSE)   
   
-  # Retrieve latest structure with updated attributes
-  curang <- set_asq_attr(tail(sq, 1)[[1]], cl, ...)
+  if (ncol(new_obs) < 4) new_obs <- cbind(new_obs, rep(NA, nrow(new_obs)))
+  names(new_obs) <- c('object', 'property', 'value', 'checkpoint')
 
-  # Call the transformation function
-  trfang <- do.call(match.fun(trans), args=list(curang, ...))
- 
-  # Updates after structural growth
-  if (trans %in% c('center', 'alternation')) {
-    if (!(is.na(trfang$partitioning) & is.na(trfang$partitioning2))) {
-      trfang <- partitioning(trfang)
-    }
-    if (!(is.na(trfang$sizing) & is.na(trfang$sizing2))) {
-      trfang <- sizing(trfang)
-    }
+  new_obs  
+}
+
+as_obs_entity <- function(df, entity = 'ENTITY') {
+  
+  # Same values differentiated by checkpoint
+  if (!('checkpoint' %in% colnames(df))) {
+    df <- df[1, ]
+    df$checkpoint <- NA
   }
+  
+  # Reshape to long format
+  df <- gather(df, object, value, -checkpoint)
+  
+  # Value observations
+  df$object <- paste0(entity, '>', df$object)
+  df$property <- 'value'
+  df$checkpoint <- as.character(df$checkpoint)
 
-  # Expand the structure list
-  sq[[length(sq)+1]] <- trfang
-   
-  # Return the sequence  
-  sq
+  # TODO: Probaly apply(df, 2, as.character) needed  
+  
+  # TODO: Data type observations as entity>attribute>type=x
+  
+  data.frame(df[ ,c('object', 'property', 'value', 'checkpoint')])
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -150,14 +204,14 @@ set_asq_attr <- function(ang, cl, ...) {
   
   # Mandatory attributes
   ang$dtstamp <- Sys.time()
-  ang$transformation <- gsub(' = ', '=', deparse(cl))[1]
-  
+#  ang$transformation <- gsub(' = ', '=', deparse(cl))[1]
+  ang$transformation <- gsub('"', "'", deparse(cl))
   # Arbitrary attributes
   aargs <- list(...)
   for (idx in seq_along(aargs)) {
     curname <- names(aargs[idx])
     isKnownName <- is.element(curname, list.graph.attributes(ang))
-    if (substr(ang$transformation, 1, 8) == 'analysis' | isKnownName) {
+    if (substr(ang$transformation[1], 1, 8) == 'analysis' | isKnownName) {
       if (!is.null(aargs[[idx]])) {
         ang <- set_graph_attr(ang, curname, aargs[[idx]]) 
       }
@@ -169,10 +223,8 @@ set_asq_attr <- function(ang, cl, ...) {
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Adjust the structure to match the current checkpoint
-# TODO: Obsolete?
-
-apply_checkpoint <- function(ang) {
+# TODO: Adjust the structure to match the current checkpoint
+trf_checkpoint <- function(ang) {
   
   ckptobs <- browseData(ang)
   
@@ -401,7 +453,7 @@ plot_ang <- function(ang, xlab=NULL, main=NULL) {
       do.call(ang$output, c(list(ang), plopt))
   } else {
     mbrp <- V(ang)$membership
-    anp <- make_clusters(ang, as.numeric(factor(mbrp)))
+    anp <- make_clusters(ang, as.numeric(factor(unlist(mbrp))))
 
     if (ang$theme == 'minimalist') {
       plopt <- c(plopt, mark.border=NA, mark.col=list(c("gray95")))
@@ -445,7 +497,7 @@ browseData <- function(sq, ckpt=NULL) {
   
   if(class(sq)=='asq') sq <- tail(sq, 1)[[1]]
   
-  obsw <- get(sq$data)
+  obsw <- get(paste0(sq$data, '_wide'))
 
   # Filter based on checkpoint
   if (is.null(ckpt)) {
@@ -478,6 +530,16 @@ browseRelations <- function(sq, ckpt=NULL) {
   subset(browseData(sq, ckpt), !is.na(objdest))
 }
 
+browseDataTable <- function(sq, object, ckpt = NULL) {
+  
+  sq_data <- browseData(sq)
+
+  # TODO: If object is a link, dest must be present  
+  sq_data <- sq_data[sq_data$objsrc == object & is.na(sq_data$objdest), ]
+  sq_data <- sq_data[ ,c('checkpoint', 'objattr', 'value')]
+  
+  spread(sq_data, objattr, value)
+}
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # TODO: Introduce 'type' attr for differentiating entities and attributes

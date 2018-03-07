@@ -16,7 +16,6 @@ Underlying asset performance and portfolio optimisation calculations will be don
 suppressMessages(suppressWarnings(library(readxl)))
 suppressMessages(suppressWarnings(library(ggplot2)))
 suppressMessages(suppressWarnings(library(PortfolioAnalytics)))
-# suppressMessages(suppressWarnings(library(tseries)))
 
 # Initiate the analysis sequence for gathering observations
 source('../strfa.R')
@@ -52,7 +51,7 @@ Annualised returns are suitable performance measurements for this kind of produc
 
 ```{r fig.height=8, fig.width=12}
 # Load fund value change data
-NAV <- read_excel('../data/fp.xlsx', sheet='prices')
+NAV <- as.data.frame(read_excel('../data/fp.xlsx', sheet='prices'))
 
 # Present as extended time series object for performance calculation functions
 nw <- reshape(NAV[ ,1:3], direction='wide', idvar=c('date'), timevar='ticker')
@@ -80,7 +79,7 @@ fp_ret <- lapply(fp_ret, period.apply, endpoints(fp_ret, 'years'), ass_ret_ann)
 fp_ret <- do.call(merge, fp_ret)
 
 # Exclude assets and years with insufficient performance data
-drops <- colnames(fp_ret['2008',is.na(fp_ret['2008'])])
+drops <- colnames(fp_ret['2007',is.na(fp_ret['2007'])])
 FUND[FUND$ticker %in% drops, c('isin', 'name', 'ccy', 'ticker')]
 
 fp_ret <- fp_ret[ ,!(names(fp_ret) %in% drops)]
@@ -118,7 +117,7 @@ fp
 *TODO: Portfolio variance should be calculated as well?*
 
 # Transactions
-From customer statements 9 types of possible transaction types were identified. Transactions affect positions and can be initiated either by the bank or the customer. We will skip analyses of some transaction types: inital conclusion fee, obsolete insurance risk premiums, possible dividend payments, and effect of widthrawals. Instead, we concentrate on more specific produduct management fee and purchase price margin analyses:
+From customer statements 9 types of possible transaction types were identified. Transactions affect positions and can be initiated either by the bank or the customer. We will skip analyses of some transaction types: inital conclusion fee, obsolete insurance risk premiums, possible dividend payments, and effect of widthrawals. Instead, we concentrate on more specific product management fee and purchase price margin analyses:
 
 ```{r fig.height=8, fig.width=12}
 # Annualised returns corrected by asset management fee
@@ -184,9 +183,9 @@ fp <- grow(fp, 'POSITION', attrs=TRUE, vals=TRUE)
 fp
 
 fig.height=20
-autoplot(fp_ret_corr)
+autoplot(fp_ret)
 
-arc3 <- fp_ret_corr[ ,c("XMWO", "TEMTACU", "PIMGIIA")]
+arc3 <- fp_ret[ ,c("XMWO", "TEMTACU", "PIMGIIA")]
 FUND[FUND$ticker %in% colnames(arc3), c('ticker', 'name', 'ccy', 'sharpe', 'stdev')]
 
 library(tseries)
