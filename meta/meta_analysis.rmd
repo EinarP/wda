@@ -11,49 +11,44 @@ output:
     fig_width: 8
     highlight: tango
 ---
-This document describes how to use the tool for supporting a wholistic data analysis process
+This document describes a tool for supporting the wholistic data analysis (explained in more detail elsewhere (*TODO: link*)) process. The essence of wholistic analysis is answering the research question (making inferences) by the sequence of wholeness-extending  transformations. Such analysis process would benefit enourmously from the availability of a support tool, due to huge amount of computation. The ecosystem for conducting analyses with the tool is described below first and then the implemented transformations
+
+# The Analysis Ecosystem
+Analysis ecosystem consists of observations and from a collection of R functions (currently all in one file):
 
 ```{r echo = FALSE}
 suppressWarnings(suppressPackageStartupMessages(library(knitr)))
 ```
-
-# About
-Wholistic data analysis is inspired by the work of architect Christopher Alexander and is presented in more detail elsewhere (*TODO: link*). This process would benefit enourmously from the availability of a support tool. Such tool as a collection of R functions is described below
-
 ```{r}
 # TODO: First rename to wda, then split to multiple files and package
 source('../strfa.R')
 ```
 
-# The Analysis Ecosystem
-In a nutshell, wholistic analysis means answering the research question (making inferences) by the sequence of wholeness-extending  transformations. The ecosystem for conducting such process is described below
+Conduction of the analyses is illustrated by the tool usage meta-analysis
 
 ## Observations
-Analyses are based on observations. These are data collected on object property values. Objects can be either entities or links between them. Hierarchy of entities can be specified by using '>' symbol to separate the levels. Links between entities contain linked entities separated with '|' symbol.
-
-Can be presented as a table in universal long format:
+Analyses are based on observations. These can be in a very universal manner presented as in the table below:
 
 ```{r echo = FALSE}
-obsf <- data.frame(list(x = '*Definition*',
-  object = 'Entity or link between entities',
-  property = 'Value or meta  characteristic',
-  value = 'Property value',
-  checkpoint = 'Notional or temporal event of measuring',
-  source = 'Where the observation came from'))
-obsf <- rbind(obsf, data.frame(list(x = '*Example*',
-  object = 'levelx>group>entity>attribute',
-  property = 'value, type',
-  value = '10, numeric',
-  checkpoint = 'DISBURSEMENT, 2018-03-03T09:57:10',
-  source = 'gl, book reference')))
-kable(obsf)
+tbl <- matrix(c('Object', "Things (nested hierarchy levels separated by '>') or links (entities separated by '|') between them", 'OBSERVATION>property, VERTEX>id|OBSERVATION'), nrow = 1) %>%
+  rbind(c('Property', 'Value or meta-characteristic', 'value, type, mandatory')) %>%
+  rbind(c('Value', 'Property value', '10, numeric, TRUE')) %>%
+  rbind(c('Instance', 'Id of an instance, if concrete cases have to be used (optional)', '123456789, LD1601300002')) %>%
+  rbind(c('Checkpoint', 'Notional or temporal event of measuring (optional)', 'DISBURSEMENT, 2018-03-03T09:57:10')) %>%
+  rbind(c('Source', 'Where the observation came from (optional)', 'gl, url, book reference'))
+
+colnames(tbl) <- c('Element', 'Definition', 'Examples')
+
+kable(tbl)
 ```
 
 Compact presentation might be handy as well:
 
 *checkpoint:levelx>group>entity>attribute>property=value{source}*
 
-Observations can be assigned to a variable (like in a code snippet below) or added directly during any transformation
+Observations can be assigned to a variable (like in a code snippet below) and/or added directly during any transformation
+
+*TODO: Generate meta-data based on analysis object definition?*
 
 ```{r}
 # Load observations for the analysis from a spreadsheet
@@ -65,6 +60,12 @@ str(anobs)
 
 # Summary of properties
 table(anobs$property)
+
+# Initialize the meta-analysis sequence
+meta <- analysis('Meta-analysis', obs = 'anobs')
+
+# Generate the structure
+(meta <- grow(meta, 'OBSERVATION', attrs = TRUE, depth = 0))
 ```
 
 ## Sequence
@@ -73,17 +74,15 @@ Progression of the analysis has a certain structure. Simple chain of incremental
 Starts with *analysis* and ends with *signoff*
 
 ```{r}
-# TODO: Generate data based on analysis object definition?
-
-# Initialize the analysis sequence
-meta <- analysis('Meta-analysis', obs = 'anobs')
-
-# Generate the structure
-meta <- grow(meta, 'SEQUENCE', depth = 2)
-
 # Polish the output with appropriate seed and partitioning
-meta <- applySeed(sq = meta, seed = 29)
-# meta <- applyPartitioning(meta, 'mbrp')
+meta <- grow(meta, 'SEQUENCE', depth = 2) %>% applySeed(417) %>% applyPartitioning('mbrp')
+```
+
+Checkpoint and instance later:
+
+```{r}
+summary(meta)
+
 meta
 ```
 
@@ -91,13 +90,15 @@ meta
 
 Something about detailed view
 
+* TODO: As similar to UML class digram as possible (except attributes separately)?*
+
 ```{r}
 # Rearrange the structure
 meta <- grow(meta, 'GRAPH', depth=2, attrs=TRUE, vals=TRUE)
 meta <- void(meta, c('INFERENCE'))
 
 # Polish the output with appropriate seed 
-meta <- applySeed(sq=meta, seed=725)
+meta <- applySeed(meta, seed = 725)
 meta
 ```
 
@@ -208,17 +209,17 @@ getTheme(meta)
 ```{r}
 # Check clustering algorithms
 browsePartitionings(meta, plot=FALSE)
-#browsePartitionings(meta)
+browsePartitionings(meta)
 
 # Visualize pregiven communities 
 browseEntities(meta)[ ,c('object', 'mbrp')]
 
 # Use pregiven partitioning instead
-#meta <- applyPartitioning(meta, 'mbrp')
+meta <- applyPartitioning(meta, 'mbrp')
 meta
 
 # Add secondary partitioning
-#meta <- applyPartitioning2(meta, 'tool_support')
+meta <- applyPartitioning2(meta, 'tool_support')
 meta
 
 # Current partitioning

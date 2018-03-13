@@ -17,7 +17,7 @@ analysis <- function(name, obs = NULL, ckpt = NULL) {
   ang <- set_asq_attr(graph.empty(), match.call(),
                       
     # Generic (sequence or multi-step) metadata
-    name = name, data = NA, checkpoint = NA, output = 'plot',
+    name = name, data = NA, checkpoint = NA, instance = NA, output = 'plot',
                       
     # Global properties with no default value
     layout = NA, partitioning = NA, partitioning2 = NA,
@@ -160,7 +160,7 @@ trf_obs <- function(sq, new_obs, sq_name) {
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Add observations
 
-# TODO: Split to functions per type
+# TODO: Split to functions per type (UseMethod)
 #  if (class(x) == 'character') {
 #  if (is.list(x) | is.matrix(x) | is.data.frame(x)) {
 
@@ -171,7 +171,7 @@ as_obs <- function(x) {
   if (ncol(new_obs) < 4) new_obs <- cbind(new_obs, rep(NA, nrow(new_obs)))
   names(new_obs) <- c('object', 'property', 'value', 'checkpoint')
 
-  new_obs  
+  new_obs
 }
 
 as_obs_entity <- function(df, entity = 'ENTITY') {
@@ -246,23 +246,25 @@ trf_checkpoint <- function(ang) {
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Return a summary table
-summary.asq <- function(sq, all=FALSE, plot=FALSE) {
+summary.asq <- function(sq, all = FALSE, plot = FALSE) {
 
   # Convert sequence list to a data frame
-  sumrows <- lapply(sq, function(ang) data.frame(get.graph.attribute(ang)))
-  sumall <- Reduce(function(...) merge(..., all=TRUE), sumrows)
+  sumrows <- lapply(sq, function(ang) {
+    data.frame(get.graph.attribute(ang), stringsAsFactors = FALSE)
+  })
+  sumall <- Reduce(function(...) merge(..., all = TRUE), sumrows)
   
   # Return all or selection of columns
   if (all) {
     sumall
   } else {
-    if (is.element('checkpoint', names(sumall))) {
-      sumall[ ,c('transformation','checkpoint')]
-    } else {
-      sumall$time <- format(sumall$dtstamp, '%R')
-      sumall[ ,c('time','transformation')]
-    } 
+    cols <- 'transformation'
+    if (sum(!is.na(sumall$checkpoint))) cols <- c(cols, 'checkpoint')
+    if (sum(!is.na(sumall$instance))) cols <- c(cols, 'instance')
+    sumall[ ,cols, drop = FALSE]
   }
+  
+# TODO: ? Obsolete: sumall$time <- format(sumall$dtstamp, '%R')
 }  
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -274,7 +276,10 @@ print.asq <- function(sq, ...) {
 
   # Textual output
   cat(ang$name, '\n\n')
-  print(tail(summary(sq), 3))
+  
+  sqs <- summary(sq)
+
+  print(tail(sqs, 3))
   
   # TODO: Output relevant global options?
   
@@ -453,8 +458,10 @@ plot_ang <- function(ang, xlab=NULL, main=NULL) {
       do.call(ang$output, c(list(ang), plopt))
   } else {
     mbrp <- V(ang)$membership
-    anp <- make_clusters(ang, as.numeric(factor(unlist(mbrp))))
 
+    # TODO: Directed graph clustering correctness is undetermined
+    anp <- make_clusters(as.undirected(ang), as.numeric(factor(unlist(mbrp))))
+ 
     if (ang$theme == 'minimalist') {
       plopt <- c(plopt, mark.border=NA, mark.col=list(c("gray95")))
       plopt <- c(plopt, edge.color='black')
@@ -734,7 +741,7 @@ getElements <- function(sq, ctype=NA) {
     ang <- sq
   }
 
-  centers <- data.frame(get.vertex.attribute(ang), stringsAsFactors=FALSE)
+  centers <- data.frame(get.vertex.attribute(ang), stringsAsFactors = FALSE)
   if (is.na(ctype)) {
     centers
   } else {
@@ -837,7 +844,11 @@ get_communities <- function(ang, method) {
 
         # Some attributes may have membership defined as well     
         ocomm <- ocomm[match(V(ang)$name, ocomm$object),method]
-        comm <- ifelse(is.na(ocomm), comm, ocomm)
+
+        # Use entity membership if attribute membership not defined
+        comm <- apply(cbind(comm, ocomm), 1, function(x) {
+          ifelse(sum(is.na(x)), x[1], x[2])
+        })
       } else {
         stop('No memberships pregiven.')
       }
