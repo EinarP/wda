@@ -1,5 +1,5 @@
 
-# TODO: Split into smaller files somehow
+# TODO: Split into smaller files
 # TODO: Use highlighting in (partitioning, sizing, etc.) error handling
 # TODO: Non-igraph layouts: trees, timelines?
 
