@@ -84,50 +84,28 @@ trf_obs <- function(sq, new_obs, sq_name) {
   
   ang <- tail(sq, 1)[[1]]
 
-  # Connect the data source
+  # Retrieve observations indirectly through referenced variable name
   if (class(new_obs) == 'character') {
+    
     data_long_ref <- new_obs
+    obsl <- as_obs(get(as.character(substitute(data_long_ref))))
+    
+  # Retrieve and/or append observations directly
   } else {
+    
     if (is.na(ang$data)) {
-      ang$data <- paste0(gsub(' ', '', sq_name), '_obs')
+      ang$data <- paste0(gsub(' ', '_', tolower(sq_name)), '_obs')
     }
     data_long_ref <- ang$data
+    obsl <- get0(as.character(substitute(data_long_ref)))
+    obsl <- rbind(obsl, as_obs(new_obs))
   }
   
-  obsl <- get0(as.character(substitute(data_long_ref)))
-  
-  # if (is.null(obsl <- get0(as.character(substitute(data_long_ref))))) {
-  #  stop("Referenced data source does not exist.")
-  #}
-
-  # TODO: Necessary to convert to wide format all the time (if not fix browseDataTable as well)
+  # TODO: Don't convert everything to wide format all the time (if not fix browseDataTable as well)?
   data_wide_ref <- paste0(data_long_ref, '_wide')
-
-  # Append to existing observations
-  if (class(new_obs) != 'character') {
-    if (is.list(new_obs) | is.matrix(new_obs) | is.data.frame(new_obs)) {
-      new_obs <- as.data.frame(new_obs, stringsAsFactors=FALSE)   
-      #    new_obs <- as.data.frame(new_obs)
-      if (ncol(new_obs) < 4) new_obs <- cbind(new_obs, rep(NA, nrow(new_obs)))
-      names(new_obs) <- c('object', 'property', 'value', 'checkpoint')
-      obsl <- rbind(obsl, new_obs)
-    } else {
-      stop('Unknown format for data observations.')
-    }
-  }
-  
-  # Tidy up checkpoints for reshaping to wide format
-  if (!is.element('checkpoint', names(obsl))) {
-    obsl$checkpoint <- 'all'
-  } else {
-    obsl[is.na(obsl$checkpoint),'checkpoint'] <- 'all'
-  }
   
   # Convert from long to wide format
-  obsl <- unique(obsl[ ,1:4])
-  # obsw <- reshape(obsl, direction='wide', idvar=c('object','checkpoint'), timevar='property')
-  
-  obsw <- spread(obsl, property, value)
+  obsw <- spread(unique(obsl), property, value)
   
   # Convert weights to numeric
   wtcol <- grep('wt_', names(obsw))
@@ -158,43 +136,76 @@ trf_obs <- function(sq, new_obs, sq_name) {
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 # Add observations
-
-# TODO: Split to functions per type (UseMethod)
-#  if (class(x) == 'character') {
-#  if (is.list(x) | is.matrix(x) | is.data.frame(x)) {
-
 as_obs <- function(x) {
 
   new_obs <- as.data.frame(x, stringsAsFactors = FALSE)   
   
-  if (ncol(new_obs) < 4) new_obs <- cbind(new_obs, rep(NA, nrow(new_obs)))
-  names(new_obs) <- c('object', 'property', 'value', 'checkpoint')
+  if (ncol(new_obs) < 3) {
+    stop('Mandatory observation fields missing.')
+  } else{
+    colnames(new_obs)[1:3] <- c('object', 'property', 'value')
+  }
 
-  new_obs
+  if (!('checkpoint' %in% colnames(new_obs))) {
+    new_obs$checkpoint <- 'all'
+  } else {
+    new_obs[is.na(new_obs$checkpoint),'checkpoint'] <- 'all'
+  }
+    
+  if (!('instance' %in% colnames(new_obs))) {
+    new_obs$instance <- NA
+  }
+  
+  # TODO: To be introduced
+  if (!('source' %in% colnames(new_obs))) {
+    new_obs$source <- NA
+  }
+
+  # TODO: obsl <- unique(obsl[ ,1:4])?
+  cols <- c('object', 'property', 'value', 'checkpoint', 'instance')
+  new_obs[ ,cols]
 }
 
-as_obs_entity <- function(df, entity = 'ENTITY') {
+# Convert a data frame to ENTITY observations
+as_obs_entity <- function(df, entity = 'ENTITY', id_cols = NULL) {
   
   # Same values differentiated by checkpoint
   if (!('checkpoint' %in% colnames(df))) {
-    df <- df[1, ]
-    df$checkpoint <- NA
+    df$checkpoint <- 'all'
   }
   
-  # Reshape to long format
-  df <- gather(df, object, value, -checkpoint)
-  
-  # Value observations
-  df$object <- paste0(entity, '>', df$object)
-  df$property <- 'value'
-  df$checkpoint <- as.character(df$checkpoint)
+  # Unique Id
+  if (missing(id_cols)) {
+    df$instance <- NA
+  } else {
+    df$instance <- do.call(paste, c(df[c(id_cols)], sep = '_'))
+  }
 
-  # TODO: Probaly apply(df, 2, as.character) needed  
+  # Reshape to long format
+  df_long <- data.frame(apply(df, 2, as.character), stringsAsFactors = FALSE)
+  df_long <- gather(df_long, object, value, -checkpoint, -instance)
+
+  # Value observations
+  df_long$object <- paste0(entity, '>', df_long$object)
+  df_long$property <- 'value'
+  df_long$checkpoint <- as.character(df_long$checkpoint)
+
+  # Currently used columns
+  cols <- c('object', 'property', 'value', 'checkpoint', 'instance')
+  df_long <- data.frame(df_long[ ,cols])
   
-  # TODO: Data type observations as entity>attribute>type=x
-  
-  data.frame(df[ ,c('object', 'property', 'value', 'checkpoint')])
+  # Data type observations as entity>attribute>type=x
+  lapply(colnames(df), function (x) {
+    if (!(x %in% c('checkpoint', 'instance'))) {
+      type_obs <- data.frame(object = paste0(entity, '>', x), property = 'type',
+        value = class(df[ ,x]), checkpoint = 'all', instance = NA)
+      df_long <<- rbind(df_long, type_obs)
+    }
+  })
+
+  df_long
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -204,15 +215,15 @@ set_asq_attr <- function(ang, cl, ...) {
   
   # Mandatory attributes
   ang$dtstamp <- Sys.time()
-#  ang$transformation <- gsub(' = ', '=', deparse(cl))[1]
-  ang$transformation <- gsub('"', "'", deparse(cl))
+  ang$transformation <- gsub('"', "'", deparse(cl))[1]
+
   # Arbitrary attributes
   aargs <- list(...)
   for (idx in seq_along(aargs)) {
     curname <- names(aargs[idx])
     isKnownName <- is.element(curname, list.graph.attributes(ang))
     if (substr(ang$transformation[1], 1, 8) == 'analysis' | isKnownName) {
-      if (!is.null(aargs[[idx]])) {
+      if (!is.null(aargs[[idx]]) & curname != 'obs') {
         ang <- set_graph_attr(ang, curname, aargs[[idx]]) 
       }
     }
@@ -537,15 +548,30 @@ browseRelations <- function(sq, ckpt=NULL) {
   subset(browseData(sq, ckpt), !is.na(objdest))
 }
 
-browseDataTable <- function(sq, object, ckpt = NULL) {
-  
-  sq_data <- browseData(sq)
+# Display observations in a table format
+browseDataTable <- function(sq, object, checkpoint = NULL, instance = NULL) {
 
-  # TODO: If object is a link, dest must be present  
+  # TODO: If object is a link, dest must be present
+  sq_data <- browseData(sq)
   sq_data <- sq_data[sq_data$objsrc == object & is.na(sq_data$objdest), ]
-  sq_data <- sq_data[ ,c('checkpoint', 'objattr', 'value')]
   
-  spread(sq_data, objattr, value)
+  # Present in wide format
+  sqdw <- sq_data[!is.na(sq_data$value),c('checkpoint', 'instance', 'objattr', 'value')]
+  sqdw <- spread(sqdw, objattr, value)
+  
+  # Apply data types
+  if ('type' %in% colnames(sq_data)) {
+    lapply(colnames(sqdw), function (x) {
+        col_type <- sq_data[!is.na(sq_data$type) & sq_data$objattr == x, 'type']
+        if (length(col_type)) {
+          sqdw[ ,x] <<- do.call(paste0('as.', col_type), list(sqdw[ ,x]))
+        }
+    })
+  }
+
+  # Output the table
+  drops <- c(ifelse(is.null(checkpoint), 'checkpoint', ''), ifelse(is.null(instance), 'instance', ''))
+  sqdw[ ,!(names(sqdw) %in% drops)]
 }
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
