@@ -796,7 +796,7 @@ getRelations <- function(sq) {
 # TODO: Grouped layout (see strfa page) for partitioning 2
 
 # Explore clustering algorithms
-browsePartitionings <- function(sq, plot=TRUE, ...) {
+browsePartitionings <- function(sq, plot = TRUE, ...) {
   
   # Available algorithms
 #  methods <- c('cluster_edge_betweenness','cluster_label_prop',
@@ -814,12 +814,12 @@ browsePartitionings <- function(sq, plot=TRUE, ...) {
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # User friendly transformation function calls for partitioning
-applyPartitioning <- function(sq, partitioning) {
-  trf(sq, 'partitioning', partitioning=partitioning, cl=match.call())
+applyPartitioning <- function(sq, partitioning, ...) {
+  trf(sq, 'partitioning', partitioning=partitioning, cl=match.call(), ...)
 }
 
-applyPartitioning2 <- function(sq, partitioning) {
-  trf(sq, 'partitioning', partitioning2=partitioning, cl=match.call())
+applyPartitioning2 <- function(sq, partitioning, ...) {
+  trf(sq, 'partitioning', partitioning2=partitioning, cl=match.call(), ...)
 }
 
 # User-friendly transformation function calls for removing partitioning
@@ -1010,12 +1010,12 @@ symmetry <- function(ang, ...) {
 browseSizings <- function(sq) {}
 
 # User friendly transformation function calls
-applySizing <- function(sq, method) {
+applySizing <- function(sq, method, ...) {
   trf(sq, 'sizing', sizing=method, cl=match.call())
 }  
 
 # TODO: Implement function
-applySizing2 <- function(sq) {}
+applySizing2 <- function(sq, method, ...) {}
 
 sizing <- function(ang, ...) {
   
@@ -1113,7 +1113,7 @@ browseSeeds <- function(sq) {
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # User-friendly transformation function call
-applySeed <- function(sq, seed=123) {
+applySeed <- function(sq, seed = 123) {
   trf(sq, 'roughness', seed=seed, cl=match.call())
 }
 
@@ -1213,8 +1213,8 @@ contrast <- function(ang, ...) {
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # User friendly grouping transformation function call
-group <- function(sq, name='group1', members=NULL, by=NULL, ...) {
-  trf(sq, 'group_trf', gname=name, members=members, by=by, cl=match.call())
+group <- function(sq, name = 'group1', members = NULL, by = NULL, ...) {
+  trf(sq, 'group_trf', gname=name, members=members, by=by, cl=match.call(), ...)
 }
 
 group_trf <- function(ang, ...) {
@@ -1298,7 +1298,7 @@ group_trf <- function(ang, ...) {
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # User friendly degrouping transformation function calls
-degroup <- function(sq, group, ...) {
+degroup <- function(sq, group) {
   trf(sq, 'degroup_trf', group=group, members=NA, cl=match.call())
 }
 
@@ -1533,7 +1533,7 @@ getSimplicity <- function(sq, ...) {
 ################################################################################
 
 # User friendly transformation function call
-void <- function(sq, centers, ckpt=NULL, ...) {
+void <- function(sq, centers, ckpt = NULL, ...) {
   trf(sq, 'thevoid', centers=centers, checkpoint=ckpt, cl=match.call(), ...)
 }
 

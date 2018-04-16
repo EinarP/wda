@@ -20,8 +20,8 @@ Analysis ecosystem consists of observations and from a collection of R functions
 suppressWarnings(suppressPackageStartupMessages(library(knitr)))
 ```
 ```{r}
-# TODO: First rename to wda, then split to multiple files and package
-source('../strfa.R')
+# TODO: Split to multiple files and package
+source('../wda.R')
 ```
 
 Conduction of the analyses is illustrated by the tool usage meta-analysis
