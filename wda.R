@@ -712,6 +712,7 @@ add_values <- function(ang, centers) {
 }
 
 # Connect vertices
+# TODO: Scanned and defined or smth like fixed and flexible?
 add_link <- function(ang, vsrc, vdest, elabel=NA, etype='defined') {
   
   elabel <- unname(elabel)
@@ -1531,6 +1532,8 @@ getSimplicity <- function(sq, ...) {
 ################################################################################
 # VOID transformations
 ################################################################################
+
+# TODO: Void relations/edges
 
 # User friendly transformation function call
 void <- function(sq, centers, ckpt = NULL, ...) {

@@ -1,0 +1,106 @@
+---
+title: "DATA CAPTURE OVERVIEW"
+output:
+  html_document: default
+  word_document: default
+---
+This is a sequential business analysis of T24 security management system. It is based on R10 model bank data
+
+Unlike other applications in T24 where a single transaction may create multiple accounting entries, DATA.CAPTURE operates by creating each accounting entry as a single transaction which, when combined with other transactions, form a ‘batch’. The following sections clarify the main components.
+[Banking Framework > Data Capture > Setup ]
+
+```{r}
+# Load analysis functions (TODO: still not happy with the name...)
+source('../../wda.r')
+
+# Load obeservations by ignoring error conditions and scanned state changes
+suppressWarnings(library(readxl))
+tobs <- read.csv('../../../data/T24R10MB.csv', stringsAsFactors = FALSE)
+tobs <- tobs[tobs$property != 'ERROR' & tobs$checkpoint == 'baseline', ]
+
+# Initiate the analysis sequence
+dc <- analysis('Data Capture Overview', 'tobs')
+dc <- grow(dc, 'DATA.CAPTURE') %>%  grow('DATA.CAPTURE', attrs = T, depth = 0)
+
+# Remove common fields
+cf <- c('LOCAL.REF', 'OVERRIDE', 'RECORD.STATUS', 'CURR.NO', 'INPUTTER')
+cf <- c(cf, 'DATE.TIME', 'AUTHORISER', 'CO.CODE', 'DEPT.CODE', 'AUDITOR.CODE', 'AUDIT.DATE.TIME')
+dc <- void(dc, paste0('DATA.CAPTURE>', cf))
+
+# Who cares about cheques: BC.SORT.CODE, CHEQUE.TYPE, CHEQUE.NUMBER
+
+```
+
+dc <- grow(sms, 'DATA.CAPTURE')
+dc <- grow(dc, 'DATA.CAPTURE', attrs = T, depth = 0)
+applyAlternation(dc)
+
+# Defined structure
+Training course T3SMS suggests that the likely primary centers are USER, OVERRIDE, DISPO.ITEMS, and EB.GC.CONSTRAINT entities
+
+```{r fig.width=15, fig.height=10}
+# Generate the initial big picture structure
+entities <- browseEntities(sms)$object
+prior_entities <- grep('USER|OVERRIDE|DISPO.|.GC.', entities, value = TRUE)
+prior_centers <- c('USER', 'OVERRIDE', 'DISPO.ITEMS', 'EB.GC.CONSTRAINTS')
+(sms <- grow(sms, prior_entities) %>% applyHighlight(prior_centers))
+
+```
+
+Cleanup based on module membership. Perhaps convert AA entities point to OVERRIDE into a group
+
+```{r fig.width=15, fig.height=10}
+
+sms <- applyPartitioning(sms, 'mbrp')
+
+elems <- getElements(sms)
+unique(elems$membership)
+
+functional_modules <- elems[!elems$membership %in% c('AC', 'EB', 'ST'), 'name']
+(sms <- void(sms, functional_modules))
+```
+
+Perhaps better not to remove these but to group later
+
+```{r fig.width=15, fig.height=10}
+# Remove not SMS related entities
+usr_pref <- c('USER.ABBREVIATION', 'BROWSER.PREFERENCES', 'LANGUAGE', 'PRINTER.ID')
+usr_ident <- c('TEC.PROFILE', 'REPORT.CONTROL', 'EB.LDAP.PARAMETER', 'EB.CHANNEL', 'EB.FILE.UPLOAD')
+autom <- c('BATCH', 'EB.PHANTOM', 'OFS.SOURCE', 'TSA.SERVICE')
+sys <- c('PGM.FILE', 'STANDARD.SELECTION')
+non_sms_elems <- c(usr_pref, usr_ident, autom, sys)
+
+(sms <- removePartitioning(sms) %>% void(non_sms_elems))
+
+
+# OVERRIDE polishing
+(sms <- grow(sms, 'OVERRIDE.CLASS'))
+
+# DISPO polishing
+
+
+# Global contraints polishing
+grow(sms, tobs[grepl('EB.GC', tobs$object) & tobs$property == 'mbrp', 'object'])
+
+```
+
+# Observed structure
+
+The DC.BATCH.CONTROL application is updated with the POSITION.TYPE record from the first entry of the batch which ensures all consecutive entries in the batch are of the same position type.
+[R16AMR: Banking Framework > MultiGaap > Deal Processing Overview > DATA.CAPTURE]
+
+```{r  fig.width=15, fig.height=10}
+# USER polishing
+proto_obs <- as_obs(list('PROTOCOL|USER>USER', 'type', 'scanned'))
+(sms <- grow(sms, 'PROTOCOL', depth = 0, obs = proto_obs))
+
+```
+
+## Conclusions
+
+What can we conclude based on analysis (or in word only?)
+
+```{r fig.width=15, fig.height=10}
+
+```
+

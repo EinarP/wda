@@ -1,5 +1,5 @@
 ---
-title: "Wholistic Data Analysis Support Tool"
+title: "Sequential Business Analysis Support Tool"
 output:
   html_document:
     fig_height: 8
@@ -11,7 +11,7 @@ output:
     fig_width: 8
     highlight: tango
 ---
-This document describes a tool for supporting the wholistic data analysis (explained in more detail elsewhere (*TODO: link*)) process. The essence of wholistic analysis is answering the research question (making inferences) by the sequence of wholeness-extending  transformations. Such analysis process would benefit enourmously from the availability of a support tool, due to huge amount of computation. The ecosystem for conducting analyses with the tool is described below first and then the implemented transformations
+The essence of the wholistic analysis  process is answering the research question (making inferences) by the sequence of wholeness-extending  transformations (explained in more detail elsewhere (*TODO: link*)). Due to computational intensity, such analysis process would benefit enourmously from the availability of a support tool. The ecosystem for conducting analyses with the tool is described below first and then the implemented transformations
 
 # The Analysis Ecosystem
 Analysis ecosystem consists of observations and from a collection of R functions (currently all in one file):
@@ -27,8 +27,8 @@ source('../wda.R')
 Conduction of the analyses is illustrated by the tool usage meta-analysis
 
 ## Observations
-Analyses are based on observations. These can be in a very universal manner presented as in the table below:
-
+Analyses are based on observations. These should be maintained in a very flexible manner, 
+to accommodate the changes. Like presented in the table below:
 ```{r echo = FALSE}
 tbl <- matrix(c('Object', "Things (nested hierarchy levels separated by '>') or links (entities separated by '|') between them", 'OBSERVATION>property, VERTEX>id|OBSERVATION'), nrow = 1) %>%
   rbind(c('Property', 'Value or meta-characteristic', 'value, type, mandatory')) %>%

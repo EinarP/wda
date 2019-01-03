@@ -1,0 +1,101 @@
+---
+title: "Asset Management (AM) Module"
+output:
+  html_document: default
+  word_document:
+    fig_height: 12
+    fig_width: 8
+    highlight: tango
+---
+We have used a dedicated program for extracting basic structural information from current T24 installation and loaded its output into a spreadsheet:
+
+*TODO: Fix dups e.g rows (111089, 111091)*
+```{r message=FALSE}
+# Load observations
+tobs <- read.csv('../../../data/T24R10MB.csv')
+
+# Load transformation functions and start the sequence
+source('../../wda.R')
+sov <- analysis('System Overview', 'tobs')
+```
+
+It is convenient to collect the source data in a long format (in this analysis there are 86543 individual object-property-value observations in our disposal), but for analysis the data in a wide format (produduced by *analysis* function) is more suitable:
+
+```{r message=FALSE}
+# Observations in a long format
+str(tobs, strict.width='cut', width=70)
+
+# Observations in a wide format
+str(tobs_wide[ ,1:(ncol(tobs_wide)-3)], strict.width='cut', width=70)
+```
+
+**Big picture.** Our first attempt to explore the structure highlights the challenges in doing that. There are just too many items to grasp:
+
+```{r}
+# Create a structure comprised of all entities
+entities <- browseEntities(sov)$object
+sov <- grow(sov, entities, depth=0)
+# load('sov2.dat')
+sov
+```
+
+**Sizing and Simplifying.** Not should all entities be treated equally.We can try to identify what makes the difference based on some metric like size in bytes, connectedness, or completeness. Below a simple record count *wt_numrec* is used for this purpose:
+
+```{r}
+# Pregiven sizing based on record counts
+sov <- applySizing(sov, 'wt_numrec')
+
+# Identify main centers
+sov <- applySimplicity(sov, n=25)
+sov
+```
+
+**Void and Partitioning.** Visualisation indicates that many entities have no connections defined. For more concrete analysis tasks, these can be discovered by scanning records for links. Also, it is quite common for a T24 installation to have a lot of tables created with no use. These can be filtered out and entities categorised by modules to which underlying tables are assigned to:
+
+```{r}
+# Remove entities with zero records
+centers <- getCenters(sov)
+zeroCenters <- centers[centers$size==0,'name']
+sov <- void(sov, centers=zeroCenters)
+
+# TODO: Would be great to see module elements clustered
+# Partition the entities by module
+sov <- applyPartitioning(sov, 'mbrp_module')
+sov
+```
+
+**Grouping.** Individual connections and relative positioning are too detailed in this context. We can make the display more compact by just grouping the entities by their membership and by preserving their numeric (sizing) importance. This gives us quite comprehensive overview of the system:
+
+```{r}
+# Group by membership attribute
+sov <- group(sov, by='membership')
+
+# Membership detection error analysis is not a concern
+errc <- c('ERR_NO_PRODUCT_IN_PGM.FILE', 'ERR_NOT_IN_PGM.FILE')
+sov <- void(sov, centers=errc)
+sov
+```
+
+**Polishing.** We can further elaborate the presentation by attempting to choose most suitable layout algorithm and experiment with randomization settings for the graph. Although for the latter, changing randomisation settings has little effect:
+
+```{r}
+browseLayouts(sov)
+sov <- applyLayout(sov, 'layout_components')
+sov
+
+# TODO: Initial seed pregiven to ensure reproducibility
+browseSeeds(sov)
+sov <- applySeed(sov, 201)
+sov
+```
+
+**Concluding.** We seem to have a somewhat typical installation where the customer’s business is comprised mostly by lending products best handled by simple accounts (AC) with significant amount of custom local development (EB). We may also notice that built in reporting/accounting (RE) module is heavily utilised.
+
+To summarise, we plot the most characteristic sequence steps. We could have also chosen to store the analysis code and data for later retrieval:
+
+```{r}
+sqmain <- c('all entities', 'sizing and simplifying', 'void and partitioning')
+sqmain <- c(sqmain, 'grouping and polishing')
+signoff(sov, thumb_seq=c(2, 4, 6, 10), thumb_narr=sqmain)
+```
+
