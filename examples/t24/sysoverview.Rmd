@@ -36,7 +36,7 @@ str(tobsw[ ,1:(ncol(tobsw)-3)], strict.width='cut', width=70)
 ```{r}
 # Create a structure comprised of all entities
 entities <- browseEntities(sov)$object
-sov <- grow(sov, entities, depth=0)
+sov <- grow(sov, entities, width=0)
 # load('sov2.dat')
 sov
 ```

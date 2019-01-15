@@ -20,7 +20,7 @@ tobs <- tobs[tobs$property != 'ERROR' & tobs$checkpoint == 'baseline', ]
 
 # Initiate the analysis sequence
 dc <- analysis('Data Capture Overview', 'tobs')
-dc <- grow(dc, 'DATA.CAPTURE') %>%  grow('DATA.CAPTURE', attrs = T, depth = 0)
+dc <- grow(dc, 'DATA.CAPTURE') %>%  grow('DATA.CAPTURE', attrs = T, width = 0)
 
 # Remove common fields
 cf <- c('LOCAL.REF', 'OVERRIDE', 'RECORD.STATUS', 'CURR.NO', 'INPUTTER')
@@ -32,7 +32,7 @@ dc <- void(dc, paste0('DATA.CAPTURE>', cf))
 ```
 
 dc <- grow(sms, 'DATA.CAPTURE')
-dc <- grow(dc, 'DATA.CAPTURE', attrs = T, depth = 0)
+dc <- grow(dc, 'DATA.CAPTURE', attrs = T, width = 0)
 applyAlternation(dc)
 
 # Defined structure
@@ -92,7 +92,7 @@ The DC.BATCH.CONTROL application is updated with the POSITION.TYPE record from t
 ```{r  fig.width=15, fig.height=10}
 # USER polishing
 proto_obs <- as_obs(list('PROTOCOL|USER>USER', 'type', 'scanned'))
-(sms <- grow(sms, 'PROTOCOL', depth = 0, obs = proto_obs))
+(sms <- grow(sms, 'PROTOCOL', width = 0, obs = proto_obs))
 
 ```
 

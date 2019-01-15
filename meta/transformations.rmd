@@ -57,7 +57,7 @@ lines(steps, dif, lwd=2, col='darkgrey')
 ## <span style="font-variant:small-caps;">Presenting-Observations</span> transformation
 
 ```{r}
-tdpo <- grow(td, 'OBS_1', depth=2)
+tdpo <- grow(td, 'OBS_1', width=2)
 tdpo <- applySeed(tdpo, 141)
 tdpo <- applyPartitioning(tdpo, 'mbrp')
 tdpo
@@ -68,7 +68,7 @@ tdpo
 ```{r}
 
 # TODO: Pehaps show attribute grouping instead
-# tdx <- grow(td, 'O1', depth=2)
+# tdx <- grow(td, 'O1', width=2)
 # tdx <- group(tdx, 'OBSERVATIONS', c('O1', 'O2', 'O3'))
 tdce <- group(tdpo, 'ANALYSIS', c('ENT_1', 'ENT_2'))
 tdce <- applySeed(tdce, 537)
@@ -137,7 +137,7 @@ applyAlternation(tdsz)
 ## <span style="font-variant:small-caps;">Levels-of-Scale</span> transformation
 
 ```{r}
-grow(td, 'LEVEL_1', depth=2)
+grow(td, 'LEVEL_1', width=2)
 ```
 
 ## <span style="font-variant:small-caps;">Local-Symmetries</span> transformation
@@ -149,7 +149,7 @@ grow(td, 'SYMMETRICAL_1', attrs=T)
 ## <span style="font-variant:small-caps;">Gradients</span> transformation
 
 ```{r}
-tdx <- grow(td, 'G_FOCUS', depth=2, attrs=T)
+tdx <- grow(td, 'G_FOCUS', width=2, attrs=T)
 tdx <- applyAlternation(tdx)
 tdx <- applyLayout(tdx, 'layout_with_lgl')
 applySeed(tdx, 299)

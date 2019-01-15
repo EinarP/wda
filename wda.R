@@ -578,31 +578,50 @@ browseDataTable <- function(sq, object, checkpoint = NULL, instance = NULL) {
 # TODO: Introduce 'type' attr for differentiating entities and attributes
 
 # User friendly transformation function call
-grow <- function(sq, elems, depth=1, attrs=FALSE, vals=FALSE, ckpt=NULL, ...) {
-  trf(sq, 'center', cl=match.call(), elems=elems,
-    depth=depth, attrs=attrs, vals=vals, checkpoint=ckpt, ...)
+grow <- function(sq, elems, width = 1, depth = 0, ckpt = NULL, ...) {
+  
+  # TODO: Gradually phase out historical arguments attrs and vals below
+  attrs <- ifelse(depth > 0, TRUE, FALSE)
+  vals <- ifelse(depth > 1, TRUE, FALSE)
+  
+  dots <- list(...)
+  if (is.logical(dots$attrs)) attrs <- dots$attrs
+  if (is.logical(dots$vals)) vals <- dots$vals
+
+  trf(sq, 'center', cl = match.call(), elems = elems, width = width,
+    depth = depth, attrs = attrs, vals = vals, checkpoint = ckpt, ...)
 }
 
-# Adding centers: entities, attributes, relations, values
+# Adding elements like entities, attributes, relations, values
 center <- function(ang, ...) {
   
-  # Temporary global graph and related observations
+  # TODO: Temporary global graph and related observations ugly
   tmpang <<- ang
   tmpobs <<- browseRelations(ang)
   
   # Arbitrary attributes
   aargs <- list(...)
   
-  # Process the vector of center names
-  lapply(aargs$elems, function(x)
-    add_entities(x, aargs$depth, attrs=aargs$attrs, vals=aargs$vals))
+# Process the vector of center names
+#  lapply(aargs$elems, function(x)
+#    add_entities(x, aargs$width, attrs=aargs$attrs, vals=aargs$vals))
 
+  elems <- aargs$elems
+  for (idx in seq_along(elems)) {
+    vals <- ifelse(grepl('=', elems[idx]), TRUE, aargs$vals)
+    if (grepl('>', elems[idx])) {
+      add_attributes(tmpang, elems[idx], vals = vals, atype = 'attribute')    
+    } else {
+      add_entities(elems[idx], aargs$width, attrs = aargs$attrs, vals = vals)
+    }
+  }
+  
   # Return the updated graph
   tmpang
 }
 
 # Add centers and their neighbors
-add_entities <- function(center, depth, attrs, vals) {
+add_entities <- function(center, width, attrs, vals) {
   
   obslnk <- tmpobs[tmpobs$objsrc==center | tmpobs$objdest==center, ]
   
@@ -622,8 +641,8 @@ add_entities <- function(center, depth, attrs, vals) {
       
         nextcenter <- ifelse(clnk['objsrc']==center, clnk['objdest'], clnk['objsrc'])
       
-        if (depth > 0) {
-          add_entities(nextcenter, depth-1, attrs, vals)
+        if (width > 0) {
+          add_entities(nextcenter, width-1, attrs, vals)
         }
         
         # TODO: Convert an attribute to a link if present

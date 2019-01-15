@@ -37,7 +37,7 @@ A metric is needed for differentiating different entities. Number of records (*w
 ```{r}
 # Create a structure comprised of source centers
 e <- browseEntities(mov, ckpt='baseline')$object
-mov <- grow(mov, e, depth=0, ckpt='baseline')
+mov <- grow(mov, e, width=0, ckpt='baseline')
 
 # Change the size of vertices to reflect record count
 mov <- applySizing(mov, 'wt_numrec')
@@ -62,7 +62,7 @@ This explains separate checkpoints for static and financial data extraction
 ```{r}
 # Add extracted static entities
 e <- browseEntities(mov, ckpt='imp_static')$object
-mov <- grow(mov, e, depth=0, ckpt='imp_static')
+mov <- grow(mov, e, width=0, ckpt='imp_static')
 
 # Migrate financial data
 e <- browseEntities(mov, ckpt='imp_financial')$object

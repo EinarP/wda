@@ -83,7 +83,7 @@ Observed items added
 ```{r  fig.width=15, fig.height=10}
 
 proto_obs <- as_obs(list('PROTOCOL|USER>USER', 'type', 'scanned'))
-(usr <- grow(usr, 'PROTOCOL', depth = 0, obs = proto_obs))
+(usr <- grow(usr, 'PROTOCOL', width = 0, obs = proto_obs))
 
 
 ```
@@ -94,7 +94,7 @@ Attributes
 
 ```{r  fig.width=15, fig.height=10}
 
-(usr <- grow(usr, c('USER', 'USER.SMS.GROUP'), attrs = TRUE, depth = 0) %>%
+(usr <- grow(usr, c('USER', 'USER.SMS.GROUP'), attrs = TRUE, width = 0) %>%
    applyLayout('layout_with_dh'))
 
 ```
@@ -109,7 +109,7 @@ entities <- getElements(sms)$name
 (ovd <- void(sms, entities[!entities %in% c('OVERRIDE.CLASS', linked_entities)]))
 
 entities <- getElements(ovd)$name
-(ovd <- grow(ovd, grep('OVERRIDE', entities, value = TRUE), attrs = TRUE, depth = 0))
+(ovd <- grow(ovd, grep('OVERRIDE', entities, value = TRUE), attrs = TRUE, width = 0))
 
 ```
 
@@ -120,7 +120,7 @@ entities <- getElements(sms)$name
 (dsp <- void(sms, grep('DISPO', entities, value = TRUE, invert = TRUE)) %>%
   grow(c('DISPO.OFFICER')))
 
-(dsp <- grow(dsp, c('DISPO.OFFICER', 'DISPO.ITEMS', 'DISPO.PARAMETER'), attrs = T, depth = 0))
+(dsp <- grow(dsp, c('DISPO.OFFICER', 'DISPO.ITEMS', 'DISPO.PARAMETER'), attrs = T, width = 0))
 
 ```
 

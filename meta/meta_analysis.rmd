@@ -62,7 +62,7 @@ meta <- analysis('Meta-analysis', obs = 'anobs')
 
 # Generate the structure
 # TODO: Modify layout to keep attributes close to entity
-(meta <- grow(meta, 'OBSERVATION', attrs = TRUE, depth = 0))
+(meta <- grow(meta, 'OBSERVATION', attrs = TRUE, width = 0))
 ```
 
 Alternatively, the observations can be added on the fly as part of the transformation. For the latter, compact presentation of observations can be handy:
@@ -81,7 +81,7 @@ Starts with *analysis* and ends with *signoff*
 
 
 # Polish the output with appropriate seed and partitioning
-meta <- grow(meta, 'SEQUENCE', depth = 2) %>% applySeed(417) %>% applyPartitioning('mbrp')
+meta <- grow(meta, 'SEQUENCE', width = 2) %>% applySeed(417) %>% applyPartitioning('mbrp')
 ```
 
 Checkpoint and instance later:
@@ -100,7 +100,7 @@ Something about detailed view
 
 ```{r}
 # Rearrange the structure
-meta <- grow(meta, 'GRAPH', depth=2, attrs=TRUE, vals=TRUE)
+meta <- grow(meta, 'GRAPH', width=2, attrs=TRUE, vals=TRUE)
 meta <- void(meta, c('INFERENCE'))
 
 # Polish the output with appropriate seed 

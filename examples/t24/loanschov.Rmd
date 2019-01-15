@@ -53,7 +53,7 @@ lsov <- void(lsov, voidList[!voidList %in% baseList])
 lsov
 
 # aaList <- c('AA.PRODUCT','AA.PROPERTY','AA.ARRANGEMENT.ACTIVITY')
-# lsov <- grow(lsov, aaList, depth=0)
+# lsov <- grow(lsov, aaList, width=0)
 
 # Keep track of each module separately
 lsov <- applyPartitioning(lsov, 'mbrp')
@@ -68,12 +68,12 @@ Add scanned links and divide into two parallel sequences by module
 
 # aasch <- void(lsov, 'LD.LOANS.AND.DEPOSITS', name='AA analysis')
 
-# lsov <- grow(lsov, 'AA.ARRANGEMENT', depth=0, attrs=TRUE)
+# lsov <- grow(lsov, 'AA.ARRANGEMENT', width=0, attrs=TRUE)
 # applySeed(aasch, 390)
 
 # Separate analysis branch for LD
 # ldsch <- void(lsov, 'AA.ARRANGEMENT', name='LD analysis')
-# lsov <- grow(lsov, 'LD.LOANS.AND.DEPOSITS', depth=0, attrs=TRUE)
+# lsov <- grow(lsov, 'LD.LOANS.AND.DEPOSITS', width=0, attrs=TRUE)
 
 # TODO: Remove irrelevant attributes
 applyAlternation(lsov)
