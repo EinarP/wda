@@ -11,47 +11,43 @@ output:
     fig_width: 8
     highlight: tango
 ---
-The essence of the wholistic analysis  process is answering the research question (making inferences) by the sequence of wholeness-extending  transformations (explained in more detail elsewhere (*TODO: link*)). Due to computational intensity, such analysis process would benefit enourmously from the availability of a support tool. The ecosystem for conducting analyses with the tool is described below first and then the implemented transformations
+An authoritative source (The BABOK Guide [BABOK_Guide_v3_Member.pdf]) presents business analysis as the practice of enabling change in an enterprise by defining needs and recommending solutions that deliver value to stakeholders. Sequential business analysis (SBA) method proposes to clarify these needs and solutions iteratively through sequences of analysis steps. This method (explained in more detail elsewhere (*TODO: link*)) is heavily influenced by late Christopher Alexander's architectural theories [NoO] and are expected to facilitate particularly adaptive analyses. As generation of sequences can be very laborious, such analysis process is practically unthinkable without proper support tools. Principles of such a tool (the analysis ecosystem) is described below first and then the implemented fundamental sequence steps (transformations). Conduction of analyses is illustrated by the tool usage meta-analysis
 
 # The Analysis Ecosystem
-Analysis ecosystem consists of observations and from a collection of R functions (currently all in one file):
+The analysis ecosystem is a collection of observations and R functions for generating sequences of transformations based on them:
 
 ```{r echo = FALSE}
 suppressWarnings(suppressPackageStartupMessages(library(knitr)))
 ```
 ```{r}
-# TODO: Split to multiple files and package
+# Load transformation functions 
+# TODO: Split into multiple files and package
 source('../wda.R')
+source('../obs.R')
 ```
 
-Conduction of the analyses is illustrated by the tool usage meta-analysis
-
 ## Observations
-Analyses are based on observations. These should be maintained in a very flexible manner, 
-to accommodate the changes. Like presented in the table below:
+Analyses are based on specifically organised data (as observations). The proposed organisation is expected to be flexible enough for supporting majority of business analysis needs. Observations have the following components:
+
 ```{r echo = FALSE}
 tbl <- matrix(c('Object', "Things (nested hierarchy levels separated by '>') or links (entities separated by '|') between them", 'OBSERVATION>property, VERTEX>id|OBSERVATION'), nrow = 1) %>%
   rbind(c('Property', 'Value or meta-characteristic', 'value, type, mandatory')) %>%
   rbind(c('Value', 'Property value', '10, numeric, TRUE')) %>%
   rbind(c('Instance', 'Id of an instance, if concrete cases have to be used (optional)', '123456789, LD1601300002')) %>%
   rbind(c('Checkpoint', 'Notional or temporal event of measuring (optional)', 'DISBURSEMENT, 2018-03-03T09:57:10')) %>%
-  rbind(c('Source', 'Where the observation came from (optional)', 'gl, url, book reference'))
+  rbind(c('Source', 'Where the observation came from (optional)', 'url, book reference'))
 
 colnames(tbl) <- c('Element', 'Definition', 'Examples')
 
 kable(tbl)
 ```
 
-Compact presentation might be handy as well:
+Observations can be gathered into a separate file (with columns as in above table and each row corresponding to an observation) and loaded before initiating the analysis sequence (like in the code snippet below).
 
-*checkpoint:levelx>group>entity>attribute>property=value{source}*
-
-Observations can be assigned to a variable (like in a code snippet below) and/or added directly during any transformation
-
-*TODO: Generate meta-data based on analysis object definition?*
+*TODO: Generate meta-data based on analysis object definition*
 
 ```{r}
-# Load observations for the analysis from a spreadsheet
+# Load observations for meta-analysis from the spreadsheet
 suppressWarnings(library(readxl))
 anobs <- read_excel('../data/meta.xlsx')
 
@@ -61,19 +57,29 @@ str(anobs)
 # Summary of properties
 table(anobs$property)
 
-# Initialize the meta-analysis sequence
+# Initialize the analysis sequence
 meta <- analysis('Meta-analysis', obs = 'anobs')
 
 # Generate the structure
+# TODO: Modify layout to keep attributes close to entity
 (meta <- grow(meta, 'OBSERVATION', attrs = TRUE, depth = 0))
 ```
 
+Alternatively, the observations can be added on the fly as part of the transformation. For the latter, compact presentation of observations can be handy:
+
+```{r}
+obs('checkpoint:entity(=instance)>attribute(>property)=value{source}')
+```
+
+
 ## Sequence
-Progression of the analysis has a certain structure. Simple chain of incremental steps is preferable, but trees, cirles, loops, etc. are possible as well. Each step  corresponds to a most appropriate (wholeness-extending) transformation
+Progression of the analysis has a certain structure. Simple chain of incremental steps is preferable, but trees, circles, loops, etc. are possible as well. Each step  corresponds to a most appropriate (wholeness-extending) transformation
 
 Starts with *analysis* and ends with *signoff*
 
 ```{r}
+
+
 # Polish the output with appropriate seed and partitioning
 meta <- grow(meta, 'SEQUENCE', depth = 2) %>% applySeed(417) %>% applyPartitioning('mbrp')
 ```
@@ -90,7 +96,7 @@ meta
 
 Something about detailed view
 
-* TODO: As similar to UML class digram as possible (except attributes separately)?*
+* TODO: As similar to UML class diagram as possible (except attributes separately)?*
 
 ```{r}
 # Rearrange the structure

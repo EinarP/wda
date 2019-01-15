@@ -4,34 +4,41 @@ output:
   html_document: default
   word_document: default
 ---
-This is a sequential business analysis of T24 security management system. It is based on R10 model bank data
+This is a sequential business analysis of T24 security management system (as identified by T3SMS training course). The analysis is based on R10 model bank data
 
 ```{r}
 # Load analysis functions (TODO: still not happy with the name...)
 source('../../wda.r')
+source('../../obs.R')
 
 # Load obeservations by ignoring error conditions and scanned state changes
 suppressWarnings(library(readxl))
 tobs <- read.csv('../../../data/T24R10MB.csv', stringsAsFactors = FALSE)
+
 tobs <- tobs[tobs$property != 'ERROR' & tobs$checkpoint == 'baseline', ]
+
+# Remove standard fields
+sf <- '>LOCAL.REF$|>OVERRIDE$|>INPUTTER$|>AUTHORISER$|>DATE.TIME$|>CURR.NO$'
+sf <- paste0(sf, '|>RECORD.STATUS$|>CO.CODE$|>DEPT.CODE$|>AUDITOR.CODE|>AUDIT.DATE.TIME$')
+tobs <- tobs[!grepl(sf, tobs$object), ]
 
 # Initiate the analysis sequence
 sms <- analysis('SMS Overview', 'tobs')
 ```
 
 # Defined structure
-Training course T3SMS suggests that the likely primary centers are USER, OVERRIDE, DISPO.ITEMS, and EB.GC.CONSTRAINT entities
+Training course suggests the naming conventions used and that the likely primary centers are USER, OVERRIDE, DISPO.ITEMS, and EB.GC.CONSTRAINT entities
 
 ```{r fig.width=15, fig.height=10}
 # Generate the initial big picture structure
 entities <- browseEntities(sms)$object
 prior_entities <- grep('USER|OVERRIDE|DISPO.|.GC.', entities, value = TRUE)
-prior_centers <- c('USER', 'OVERRIDE', 'DISPO.ITEMS', 'EB.GC.CONSTRAINTS')
+prior_centers <- c('USER', 'OVERRIDE', 'DISPO.OFFICER', 'EB.GC.CONSTRAINTS')
 (sms <- grow(sms, prior_entities) %>% applyHighlight(prior_centers))
 
 ```
 
-Cleanup based on module membership. Perhaps convert AA entities point to OVERRIDE into a group
+Cleanup based on module membership as SMS affects all functional modules
 
 ```{r fig.width=15, fig.height=10}
 
@@ -40,11 +47,13 @@ sms <- applyPartitioning(sms, 'mbrp')
 elems <- getElements(sms)
 unique(elems$membership)
 
-functional_modules <- elems[!elems$membership %in% c('AC', 'EB', 'ST'), 'name']
+functional_modules <- elems[!elems$membership %in% c('EB', 'ST'), 'name']
 (sms <- void(sms, functional_modules))
 ```
 
-Perhaps better not to remove these but to group later
+Remove items related to preferences, automation, and meta-items
+
+*TODO: Perhaps convert AA entities pointing to OVERRIDE and non-sms items into groups*
 
 ```{r fig.width=15, fig.height=10}
 # Remove not SMS related entities
@@ -55,25 +64,72 @@ sys <- c('PGM.FILE', 'STANDARD.SELECTION')
 non_sms_elems <- c(usr_pref, usr_ident, autom, sys)
 
 (sms <- removePartitioning(sms) %>% void(non_sms_elems))
+```
 
+# User profiling
 
-# OVERRIDE polishing
-(sms <- grow(sms, 'OVERRIDE.CLASS'))
+Branch off with USER related entities
 
-# DISPO polishing
+```{r  fig.width=15, fig.height=10}
+links <- getRelations(sms)$name
+linked_entities <- gsub('USER\\||\\|USER', '', grep('^USER|USER$', links, value = TRUE))
 
+entities <- getElements(sms)$name
+(usr <- void(sms, entities[!entities %in% c('USER', linked_entities)]))
+```
 
-# Global contraints polishing
-grow(sms, tobs[grepl('EB.GC', tobs$object) & tobs$property == 'mbrp', 'object'])
+Observed items added
+
+```{r  fig.width=15, fig.height=10}
+
+proto_obs <- as_obs(list('PROTOCOL|USER>USER', 'type', 'scanned'))
+(usr <- grow(usr, 'PROTOCOL', depth = 0, obs = proto_obs))
+
 
 ```
 
-# Observed structure
+Attributes
+
+*TODO: Group attributes*
 
 ```{r  fig.width=15, fig.height=10}
-# USER polishing
-proto_obs <- as_obs(list('PROTOCOL|USER>USER', 'type', 'scanned'))
-(sms <- grow(sms, 'PROTOCOL', depth = 0, obs = proto_obs))
+
+(usr <- grow(usr, c('USER', 'USER.SMS.GROUP'), attrs = TRUE, depth = 0) %>%
+   applyLayout('layout_with_dh'))
+
+```
+
+# Overrides
+
+```{r  fig.width=15, fig.height=10}
+links <- getRelations(sms)$name
+linked_entities <- gsub('OVERRIDE\\||\\|OVERRIDE', '', grep('^OVERRIDE|OVERRIDE$', links, value = TRUE))
+
+entities <- getElements(sms)$name
+(ovd <- void(sms, entities[!entities %in% c('OVERRIDE.CLASS', linked_entities)]))
+
+entities <- getElements(ovd)$name
+(ovd <- grow(ovd, grep('OVERRIDE', entities, value = TRUE), attrs = TRUE, depth = 0))
+
+```
+
+# Dispo control
+
+```{r  fig.width=15, fig.height=10}
+entities <- getElements(sms)$name
+(dsp <- void(sms, grep('DISPO', entities, value = TRUE, invert = TRUE)) %>%
+  grow(c('DISPO.OFFICER')))
+
+(dsp <- grow(dsp, c('DISPO.OFFICER', 'DISPO.ITEMS', 'DISPO.PARAMETER'), attrs = T, depth = 0))
+
+```
+
+# Global constraings
+
+```{r  fig.width=15, fig.height=10}
+
+# Global contraints polishing
+grow(sms, tobs[grepl('EB.GC', tobs$object) & tobs$property == 'mbrp', 'object'])
 
 ```
 
