@@ -421,9 +421,12 @@ plot_ang <- function(ang, xlab=NULL, main=NULL) {
     }
   }
   
+  label_color = adjustcolor('blue4', 0.8)
   plopt <- c(plopt, layout=list(layout), 
     vertex.label.family='sans', edge.label.family='sans', edge.arrow.size=0.4,
-    edge.label.cex=0.8, edge.curved=list(0.3*which_mutual(ang)))
+    edge.label.cex=0.8, edge.curved=list(0.3*which_mutual(ang)), 
+    vertex.label.color = label_color, edge.label.color = label_color
+  )
   
   # TODO: cluster coloring
   # If Simplicity, color notes to represent communities
@@ -463,6 +466,9 @@ plot_ang <- function(ang, xlab=NULL, main=NULL) {
   hl_idx <- as.logical(V(ang)$contrast)
   V(ang)[hl_idx]$color <- thmopt$vertex_contrast_color
   V(ang)[hl_idx]$label.cex <- thmopt$vertex_contrast_label_cex
+  
+  # Label sizes in different elements
+  V(ang)[V(ang)$type=='attribute']$label.cex <- 0.8
   
   # Output a graph or a graph with community
   if (is.na(ang$partitioning) | !is.na(ang$simplicity)) {

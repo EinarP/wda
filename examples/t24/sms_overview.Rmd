@@ -47,6 +47,7 @@ sms <- applyPartitioning(sms, 'mbrp')
 elems <- getElements(sms)
 unique(elems$membership)
 
+# TODO: Perhaps group functional entities which rely on USER
 functional_modules <- elems[!elems$membership %in% c('EB', 'ST'), 'name']
 (sms <- void(sms, functional_modules))
 ```
@@ -114,15 +115,27 @@ entities <- getElements(ovd)$name
 ```
 
 # Dispo control
+Partial dispo
 
 ```{r  fig.width=15, fig.height=10}
-entities <- getElements(sms)$name
-(dsp <- void(sms, grep('DISPO', entities, value = TRUE, invert = TRUE)) %>%
-  grow(c('DISPO.OFFICER')))
+# Basic structure
+(dsp <- void(sms, grep('DISPO', getElements(sms)$name, value = TRUE, invert = TRUE)))
+  
+dsp <- grow(dsp, c('DISPO.OFFICER'))
 
-(dsp <- grow(dsp, c('DISPO.OFFICER', 'DISPO.ITEMS', 'DISPO.PARAMETER'), attrs = T, width = 0))
+# TODO: Do not show @ID attribute if not part of link
+all_attrs <- c('DISPO.PARAMETER', 'DISPO.OFFICER', 'DISPO.ITEMS')
+dsp <- grow(dsp, all_attrs, depth = 1, width = 0)
+
+attrs <- paste0('OVERRIDE>', c('APPLICATION', 'DISPO', 'DISPO.OFFICER'))
+(dsp <- grow(dsp, attrs, depth = 1, width = 0))
+
+members <- c('ACCOUNT', 'CUSTOMER', 'LIMIT', 'POSTING.RESTRICT')
+(dsp <- group(dsp, 'AC-CU-LI-PR', members) %>% applyAlternation())
+
 
 ```
+Full dispo
 
 # Global constraings
 
@@ -133,11 +146,25 @@ grow(sms, tobs[grepl('EB.GC', tobs$object) & tobs$property == 'mbrp', 'object'])
 
 ```
 
+layout 9?
+
+```{r fig.width=15, fig.height=10}
+(gc <- void(sms, grep('EB.GC', getElements(sms)$name, value = TRUE, invert = TRUE)))
+
+gc <- grow(gc, getElements(gc)$name) %>%
+  grow(grep('EB.GC', getElements(gc)$name, value = TRUE), depth = 1, width = 0)
+
+# TODO: Rethink entity Id concept and do not display it unless part of link
+(gc <- void(gc, grep('>@ID', getElements(gc)$name, value = TRUE)))
+
+applyAlternation(gc)
+
+```
 ## Conclusions
 
 What can we conclude based on analysis (or in word only?)
 
-```{r fig.width=15, fig.height=10}
+```{r}
 
 ```
 
