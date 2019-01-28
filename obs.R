@@ -32,7 +32,24 @@ obs.character <- function(obs) {
     c(object = o, property = p, value = v)
   }))
   
-  data.frame(obs_mtx, stringsAsFactors = FALSE)
+  splitObs(data.frame(obs_mtx, stringsAsFactors = FALSE))
 }
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+# TODO: Perhaps ouput E, E2, A, MA, V, ID, CKPT in obs already?
+splitObs <- function(obs) {
+
+  s <- strsplit(obs$object, '\\|')
+  obs$h_ent_src <- unlist(lapply(s, function(x) x[1]))
+  obs$h_ent_dest <- lapply(s, function(x) x[2])
+
+  s <- strsplit(obs$h_ent_src, '>')
+  obs$h_ent_src <- lapply(s, function(x) x[1])
+  obs$h_attr <- ifelse(is.na(obs$h_ent_dest), obs$property, lapply(s, function(x) x[2]))
+  obs$h_meta_attr <- ifelse(is.na(obs$h_ent_dest), NA, obs$property) 
+
+  obs$h_value <- obs$value
+  
+  obs
+}

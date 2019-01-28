@@ -104,28 +104,33 @@ trf_obs <- function(sq, new_obs, sq_name) {
   # TODO: Don't convert everything to wide format all the time (if not fix browseDataTable as well)?
   data_wide_ref <- paste0(data_long_ref, '_wide')
   
-  # Convert from long to wide format
-  obsw <- spread(unique(obsl), property, value)
-  
-  # Convert weights to numeric
-  wtcol <- grep('wt_', names(obsw))
-  obsw[ ,wtcol] <- apply(obsw[ ,wtcol], 2, as.numeric)
-  
-  # Append helper columns (with dummy attribute if needed)
-  hc <- sapply(obsw$object, function(x) {
-    if (grepl('|', x) & !grepl('>', x))
-      sub('\\|', sub('\\|', '_', paste0('>.', x, '>')), x)
-    else
-      sub('\\|', '>', x)
-  })
-  hc <- strsplit(hc, '>', fixed=TRUE)
-  obsw$objsrc <- sapply(hc, function(x) x[1])
-  obsw$objattr <- sapply(hc, function(x) x[2])
-  obsw$objdest <- sapply(hc, function(x) x[3])
-  
-  # Tidy up
-  names(obsw) <- gsub('value.', '', names(obsw))
-  obsw <- obsw[with(obsw, order(object, checkpoint)), ]
+  if (!'h_meta_attr' %in% colnames(obsl)) {
+ 
+    # Convert from long to wide format
+    obsw <- spread(unique(obsl), property, value)
+    
+    # Convert weights to numeric
+    wtcol <- grep('wt_', names(obsw))
+    obsw[ ,wtcol] <- apply(obsw[ ,wtcol], 2, as.numeric)
+    
+    # Append helper columns (with dummy attribute if needed)
+    hc <- sapply(obsw$object, function(x) {
+      if (grepl('|', x) & !grepl('>', x))
+        sub('\\|', sub('\\|', '_', paste0('>.', x, '>')), x)
+      else
+        sub('\\|', '>', x)
+    })
+    hc <- strsplit(hc, '>', fixed=TRUE)
+    obsw$objsrc <- sapply(hc, function(x) x[1])
+    obsw$objattr <- sapply(hc, function(x) x[2])
+    obsw$objdest <- sapply(hc, function(x) x[3])
+    
+    # Tidy up
+    names(obsw) <- gsub('value.', '', names(obsw))
+    obsw <- obsw[with(obsw, order(object, checkpoint)), ]
+  } else {
+    obsw <- obsl
+  }
   
   # Caching of long to wide transformation???
   assign(data_long_ref, obsl, envir=.GlobalEnv)
