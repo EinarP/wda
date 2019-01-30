@@ -14,7 +14,7 @@ output:
 ```{r echo = FALSE}
 suppressWarnings(suppressPackageStartupMessages(library(knitr)))
 ```
-An authoritative source (The BABOK Guide [BABOK_Guide_v3_Member.pdf]) defines business analysis as practice of enabling change in an enterprise by defining needs and recommending solutions that deliver value to stakeholders. Sequential business analysis (SBA) method proposes to clarify these needs and solutions iteratively through sequences of specific analysis steps. This method (explained in more detail elsewhere (*TODO: link*)) is heavily influenced by late Christopher Alexander's architectural theories [NoO] and are expected to facilitate particularly adaptive analyses. As generating of sequences can be very laborious, such analysis process is practically unthinkable without proper support tools. Principles of such tool (the analysis ecosystem) is described below first and then the implemented fundamental sequence steps (transformations). Conduction of analyses is illustrated by the tool usage meta-analysis
+An authoritative source (The BABOK Guide [BABOK_Guide_v3_Member.pdf]) defines business analysis as practice of enabling change in an enterprise by defining needs and recommending solutions that deliver value to stakeholders. Sequential business analysis (SBA) method proposes to clarify these needs and solutions iteratively through sequences of specific analysis steps. This method (explained in more detail elsewhere (*TODO: link*)) is heavily influenced by late Christopher Alexander's architectural theories [NoO] and is expected to facilitate particularly adaptive analyses. As generation of sequences can be very laborious, such analysis process is practically unthinkable without proper support tools. Principles of such tool (the analysis ecosystem) is described below first and then the implemented fundamental sequence steps (transformations). Conduction of analyses is illustrated by the tool usage meta-analysis
 
 # The Analysis Ecosystem
 The analysis ecosystem is a collection of observations and R functions for generating sequences of transformations based on them:
@@ -27,13 +27,15 @@ source('../obs.R')
 ```
 
 ## Observations
-Analyses are based on data suitabily organised as observations. The proposed organisation is expected to be flexible enough for supporting majority of business analysis needs. Observations have the following components:
+Analyses are based on data suitabily organised as observations. The proposed organisation is expected to be flexible enough for supporting majority of business analysis needs. Observations have the following components (OPVC):
 
 ```{r echo = FALSE}
-tbl <- matrix(c('Object', "Things (nested hierarchy levels separated by '>') or links (entities separated by '|') between them", 'OBSERVATION>property, VERTEX>id|OBSERVATION'), nrow = 1) %>%
-  rbind(c('Property', 'Entity attribute or object meta-characteristic', 'value, type, mandatoriness')) %>%
-  rbind(c('Value', 'Property value', '10, numeric, TRUE')) %>%
-  rbind(c('Checkpoint', 'Notional or temporal event of measuring (optional)', 'DISBURSEMENT, 2018-03-03T09:57:10'))
+tbl <- rbind(
+  c('Object', "Things (nested hierarchy levels separated by '>') or links (entities separated by '|') between them", 'OBSERVATION>property, VERTEX>id|OBSERVATION'), 
+  c('Property', 'Entity attribute or object meta-characteristic', 'amount, type, mandatoriness'),
+  c('Value', 'Property value', '10, numeric, TRUE'),
+  c('Checkpoint', 'Notional or temporal event of measuring', 'DISBURSEMENT, 2018-03-03T09:57:10')
+)
 
 colnames(tbl) <- c('Element', 'Definition', 'Examples')
 
@@ -41,7 +43,7 @@ kable(tbl)
 ```
 
 ### Loading from file
-Observations can be gathered into a separate file (with columns as in above table and each row corresponding to an observation) and loaded before initiating the analysis sequence (like in the code snippet below).
+Observations can be gathered into a separate file (with OPVC columns and each row corresponding to an observation) and loaded before initiating the analysis sequence:
 
 ```{r}
 # Load observations for meta-analysis from the spreadsheet
@@ -54,30 +56,31 @@ meta <- analysis('Meta-analysis', obs = 'anobs')
 ```
 
 ### Textual definition
-Alternatively, the observations can be added on the fly as part of the transformation. For the latter, compact presentation of observations can be handy:
+Alternatively, the observations can be added on the fly as part of the transformation. For the latter, in a compact form defintion of observations can be handy:
 
 ```{r echo = FALSE}
 
 tbl <- rbind(
   c('O', 'O', 'NA', 'NA', 'O', 'NA', 'NA', 'NA', 'NA'),
   c('O>P', 'O', 'P', 'NA', 'O', 'NA', 'P', 'NA', 'NA'),
-  c('O=V', 'O',	'id', 'V', 'O', 'NA', 'id', 'NA', 'V'),
+  c('O=id', 'O>id',	'NA', 'NA', 'O', 'NA', 'NA', '(id)', 'NA'),
   c('O>P=V', 'O',	'P', 'V', 'O', 'NA', 'P', 'NA', 'V'),
-  c('O=V>P=V2', 'O', 'id', 'V', 'O', 'NA', 'id', 'NA', 'V'),
-  c('', 'O', 'P', 'V2', 'O', 'NA', 'P', 'NA', 'V2'),
-  c('O>P>V=V2', 'O>P', 'V', 'V2', 'O', 'NA', 'P', 'V', 'V'),
-  c('O|O2', 'O>id|O2', 'type', 'strong', 'O', 'O2', 'id', 'type', 'strong'),
-  c('O>P|O2', 'O>P|O2', 'type', 'strong', 'O', 'O2', 'P', 'type', 'strong'),
-  c('O|O2=V', 'O>id|O2', 'type', 'strong', 'O', 'O2', 'id', 'type', 'strong'),
-  c('O>P|O2=V', 'O>P|O2', 'type', 'strong', 'O', 'O2', 'P', 'type', 'V'),
-  c('O|O2>P2=V', 'O>id|O2', 'type', 'strong', 'O', 'O2', 'id', 'P2', 'V'),
-  c('O>P|O2>P2=V', 'O>P|O2', 'type', 'strong', 'O', 'O2', 'P', 'P2', 'V')
+  c('O=id>P=V', 'O>id', 'P', 'V', 'O', 'NA', 'P', '(id)', 'V'),
+  c('O>P>V=V2', 'O>P', 'V', 'V2', 'O', 'NA', 'P', 'V', 'V2'),
+  c('O|O2', 'O>id|O2', 'type', 'weak', 'O', 'O2', 'id', 'type', 'weak'),
+  c('O>P|O2', 'O>P|O2', 'type', 'weak', 'O', 'O2', 'P', 'type', 'weak'),
+  c('O|O2=V', 'O>id|O2', 'type', 'weak', 'O', 'O2', 'id', 'type', 'weak'),
+  c('O>P|O2=V', 'O>P|O2', 'type', 'V', 'O', 'O2', 'P', 'type', 'V'),
+  c('O|O2>P2=V', 'O>id|O2', 'P2', 'V', 'O', 'O2', 'id', 'P2', 'V'),
+  c('O>P|O2>P2=V', 'O>P|O2', 'P2', 'V', 'O', 'O2', 'P', 'P2', 'V')
 )
 
 colnames(tbl) <- c('definition', 'object', 'property', 'value', 'h_ent', 'h_ent2', 'h_attr', 'h_meta', 'h_val')
 
 kable(tbl)
 ```
+
+Helper fields *h_* will be added for observations table for convinience. Current notation supports on entity level only *id* meta property and stores the *id* value itself in h_meta column
 
 *TODO: Illustrate adding of obs from text*
 
@@ -89,8 +92,6 @@ kable(tbl)
 
 ```{r}
 
-# Generate the structure
-meta <- grow(meta, 'OBSERVATION', attrs = TRUE, width = 0)
 
 ```
 
@@ -100,18 +101,15 @@ Progression of the analysis has a certain structure. Simple chain of incremental
 Starts with *analysis* and ends with *signoff*
 
 ```{r}
-# TODO: Modify layout to keep attributes close to entity
-
 # Polish the output with appropriate seed and partitioning
-meta <- grow(meta, 'SEQUENCE', width = 2) %>% applySeed(417) %>% applyPartitioning('mbrp')
+(meta <- grow(meta, 'OBSERVATION', depth = 1, width = 0) %>% grow('SEQUENCE', width = 2) %>% 
+   applyPartitioning('mbrp') %>% applySeed(417))
 ```
 
-Checkpoint and instance later:
+*TODO: Checkpoint and instance*
 
 ```{r}
 summary(meta)
-
-meta
 ```
 
 ## Structural component
@@ -205,6 +203,9 @@ getSeed(meta)
 ```
 
 ## Layout
+
+*TODO: Modify layout to keep attributes close to entity*
+
 ```{r}
 # Check for appropriate layout (without partitioning as not always supported)
 meta <- removePartitioning(meta)
