@@ -1,5 +1,5 @@
 ################################################################################
-# Observations handling
+# OBSERVATIONS handling
 ################################################################################
 
 obs <- function(x, ...) UseMethod('obs')
@@ -7,79 +7,55 @@ obs <- function(x, ...) UseMethod('obs')
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 obs.character <- function(obs) {
-# obs = {E1>a|E2, E1|E2, E1|E2=v, E>a, E>a=v}; TODO: E=id>a=v
   
-  obs_mtx <- do.call(rbind, lapply(obs, function(x) {
+  mtx <- do.call(rbind, lapply(obs, function(x) {
     
-    # Extract value
-    s <- strsplit(x, '=')[[1]]
-    op <- s[1] ; v = s[2]
+    # Separate value and split to entities
+    vs <- strsplit(x, '=')[[1]]
+    v <- vs[2]
     
-    # Extract object and property
-    s <- strsplit(op, '>')[[1]]
-    o <- s[1] ; p = s[2]
+    es <- strsplit(vs[1], '\\|')[[1]]
+    e1s <- strsplit(es[1], '>')[[1]]
+    o <- e1s[1]
     
-    # Default missing object, property, or value
-    if (is.na(p)) {
-      if (grepl('\\|', o)) {
-        s <- strsplit(op, '\\|')[[1]]
-        o <- paste0(s[1], '>id|', s[2]) ; p <- 'type'
-        if (is.na(v)) v <- 'weak'
-      } else {
- #       p <- 'id'
-      }
+    # Process things if one entity
+    if (is.na(es[2])) {
+      
+      p <- ifelse(e1s[2] == '', NA, e1s[2])
+      m <- ifelse(!is.na(v) & is.na(p) & is.na(e1s[3]), 'id', e1s[3])
+      
+      if (!is.na(p) & !is.na(m)) { o <- paste0(o, '>', p) ; p <- m }
+      if (is.na(p) & !is.na(m)) o <- paste0(o, '>', m)
+      
+    # Process links
+    } else {
+      
+      e2s <- strsplit(es[2], '>')[[1]]
+      p <- ifelse(is.na(e1s[2]), 'id', e1s[2])
+      
+      o <- paste0(o, '>', p, '|', e2s[1])
+      p <- ifelse(is.na(e2s[2]), 'type', e2s[2])
+      
+      if (is.na(v)) v <- 'weak'
     }
-   
+    
     # Output vector
     c(object = o, property = p, value = v)
   }))
   
-<<<<<<< HEAD
-  completeObsFields(data.frame(obs_mtx, stringsAsFactors = FALSE))
-=======
-  addObsHelperFields(data.frame(obs_mtx, stringsAsFactors = FALSE))
->>>>>>> 841a4b28d84447672fbba74239d20953e9c35c23
+  addObsHelper(data.frame(mtx, stringsAsFactors = FALSE))
 }
-
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 obs.data.frame <- function(opvci) {
   
-  completeObsFields(opvci)
+  addObsHelper(opvci)
 }
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# TODO: Perhaps ouput E, E2, A, MA, V, ID, CKPT in obs already?
-<<<<<<< HEAD
-completeObsFields <- function(opvci) {
-
-  # Add missing or tidy up existing checkpoints
-  if (!is.element('checkpoint', colnames(opvci))) {
-    opvci$checkpoint <- 'all'
-  } else {
-    opvci[is.na(opvci$checkpoint),'checkpoint'] <- 'all'
-  }
-
-  # Add id for instance modelling
-  if (!is.element('id', colnames(opvci))) {
-    opvci$id <- NA
-  }
-    
-  # Link between entities if h_ent2 present
-  s <- strsplit(opvci$object, '\\|')
-  opvci$h_ent <- unlist(lapply(s, function(x) x[1]))
-  opvci$h_ent2 <- lapply(s, function(x) x[2])
-
-  s <- strsplit(opvci$h_ent, '>')
-  opvci$h_ent <- lapply(s, function(x) x[1])
-  opvci$h_attr <- ifelse(is.na(opvci$h_ent2), opvci$property, lapply(s, function(x) x[2]))
-  opvci$h_meta <- ifelse(is.na(opvci$h_ent2), NA, opvci$property) 
-
-  opvci
-=======
-addObsHelperFields <- function(opvc) {
-
+addObsHelper <- function(opvc) {
+  
   # Add missing or tidy up existing checkpoints
   if (!('checkpoint' %in% colnames(opvc))) {
     opvc$checkpoint <- 'all'
@@ -87,18 +63,20 @@ addObsHelperFields <- function(opvc) {
     opvc[is.na(opvc$checkpoint),'checkpoint'] <- 'all'
   }
   
-  # Link between entities if h_ent2 present
-  s <- strsplit(opvc$object, '\\|')
-  opvc$h_ent <- unlist(lapply(s, function(x) x[1]))
-  opvc$h_ent2 <- lapply(s, function(x) x[2])
-
-  s <- strsplit(opvc$h_ent, '>')
-  opvc$h_ent <- lapply(s, function(x) x[1])
-  opvc$h_attr <- ifelse(is.na(opvc$h_ent2), opvc$property, lapply(s, function(x) x[2]))
-  opvc$h_meta <- ifelse(is.na(opvc$h_ent2), NA, opvc$property) 
-
-  opvc$h_value <- opvc$value
+  # Helper entity columns
+  es <- strsplit(opvc$object, '\\|')
+  opvc$h_ent2 <- lapply(es, function(x) x[2])
+  
+  opvc$h_ent <- unlist(lapply(es, function(x) x[1]))
+  e1s <- strsplit(opvc$h_ent, '>')
+  opvc$h_ent <- lapply(e1s, function(x) x[1])
+  
+  # Helper attibute and meta columns
+  attr <- lapply(e1s, function(x) x[2])
+  opvc$h_attr <- ifelse(!is.na(opvc$h_ent2), attr,
+    ifelse(is.na(attr), opvc$property, ifelse(is.na(opvc$property), NA, attr)))
+  opvc$h_meta <- ifelse(!is.na(opvc$h_ent2), opvc$property,
+    ifelse(is.na(attr), NA, ifelse(is.na(opvc$property), attr, opvc$property)))
   
   opvc
->>>>>>> 841a4b28d84447672fbba74239d20953e9c35c23
 }

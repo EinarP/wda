@@ -61,26 +61,26 @@ Alternatively, the observations can be added on the fly as part of the transform
 ```{r echo = FALSE}
 
 tbl <- rbind(
-  c('O', 'O', 'NA', 'NA', 'O', 'NA', 'NA', 'NA', 'NA'),
-  c('O>P', 'O', 'P', 'NA', 'O', 'NA', 'P', 'NA', 'NA'),
-  c('O=id', 'O>id',	'NA', 'NA', 'O', 'NA', 'NA', '(id)', 'NA'),
-  c('O>P=V', 'O',	'P', 'V', 'O', 'NA', 'P', 'NA', 'V'),
-  c('O=id>P=V', 'O>id', 'P', 'V', 'O', 'NA', 'P', '(id)', 'V'),
-  c('O>P>V=V2', 'O>P', 'V', 'V2', 'O', 'NA', 'P', 'V', 'V2'),
-  c('O|O2', 'O>id|O2', 'type', 'weak', 'O', 'O2', 'id', 'type', 'weak'),
-  c('O>P|O2', 'O>P|O2', 'type', 'weak', 'O', 'O2', 'P', 'type', 'weak'),
-  c('O|O2=V', 'O>id|O2', 'type', 'weak', 'O', 'O2', 'id', 'type', 'weak'),
-  c('O>P|O2=V', 'O>P|O2', 'type', 'V', 'O', 'O2', 'P', 'type', 'V'),
-  c('O|O2>P2=V', 'O>id|O2', 'P2', 'V', 'O', 'O2', 'id', 'P2', 'V'),
-  c('O>P|O2>P2=V', 'O>P|O2', 'P2', 'V', 'O', 'O2', 'P', 'P2', 'V')
+  c('O', 'O', 'NA', 'NA', 'O', 'NA', 'NA', 'NA'),
+  c('O>P', 'O', 'P', 'NA', 'O', 'NA', 'P', 'NA'),
+  c('O>P=V', 'O', 'P', 'V', 'O', 'NA', 'P', 'NA'),
+  c('O=V', 'O>id', 'NA', 'V', 'O', 'NA', 'NA', 'id'),
+  c('O>>M=V', 'O>M', 'NA', 'V', 'O', 'NA', 'NA', 'M'),
+  c('O>P>M=V', 'O>P', 'M', 'V', 'O', 'NA', 'P', 'M'),
+  c('O|O2', 'O>id|O2', 'type', 'weak', 'O', 'O2', 'id', 'type'),
+  c('O>P|O2', 'O>P|O2', 'type', 'weak', 'O', 'O2', 'P', 'type'),
+  c('O|O2=V', 'O>id|O2', 'type', 'V', 'O', 'O2', 'id', 'type'),
+  c('O>P|O2=V', 'O>P|O2', 'type', 'V', 'O', 'O2', 'P', 'type'),
+  c('O|O2>M=V', 'O>id|O2', 'M', 'V', 'O', 'O2', 'id', 'M'),
+  c('O>P|O2>M=V', 'O>P|O2', 'M', 'V', 'O', 'O2', 'P', 'M') 
 )
 
-colnames(tbl) <- c('definition', 'object', 'property', 'value', 'h_ent', 'h_ent2', 'h_attr', 'h_meta', 'h_val')
+colnames(tbl) <- c('definition', 'object', 'property', 'value', 'h_ent', 'h_ent2', 'h_attr', 'h_meta')
 
 kable(tbl)
 ```
 
-Helper fields *h_* will be added for observations table for convinience. Current notation supports on entity level only *id* meta property and stores the *id* value itself in h_meta column
+Helper fields *h_* will be added for observations table for convinience
 
 *TODO: Illustrate adding of obs from text*
 
