@@ -34,7 +34,11 @@ obs.character <- function(obs) {
     c(object = o, property = p, value = v)
   }))
   
+<<<<<<< HEAD
   completeObsFields(data.frame(obs_mtx, stringsAsFactors = FALSE))
+=======
+  addObsHelperFields(data.frame(obs_mtx, stringsAsFactors = FALSE))
+>>>>>>> 841a4b28d84447672fbba74239d20953e9c35c23
 }
 
 
@@ -47,6 +51,7 @@ obs.data.frame <- function(opvci) {
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # TODO: Perhaps ouput E, E2, A, MA, V, ID, CKPT in obs already?
+<<<<<<< HEAD
 completeObsFields <- function(opvci) {
 
   # Add missing or tidy up existing checkpoints
@@ -72,4 +77,28 @@ completeObsFields <- function(opvci) {
   opvci$h_meta <- ifelse(is.na(opvci$h_ent2), NA, opvci$property) 
 
   opvci
+=======
+addObsHelperFields <- function(opvc) {
+
+  # Add missing or tidy up existing checkpoints
+  if (!('checkpoint' %in% colnames(opvc))) {
+    opvc$checkpoint <- 'all'
+  } else {
+    opvc[is.na(opvc$checkpoint),'checkpoint'] <- 'all'
+  }
+  
+  # Link between entities if h_ent2 present
+  s <- strsplit(opvc$object, '\\|')
+  opvc$h_ent <- unlist(lapply(s, function(x) x[1]))
+  opvc$h_ent2 <- lapply(s, function(x) x[2])
+
+  s <- strsplit(opvc$h_ent, '>')
+  opvc$h_ent <- lapply(s, function(x) x[1])
+  opvc$h_attr <- ifelse(is.na(opvc$h_ent2), opvc$property, lapply(s, function(x) x[2]))
+  opvc$h_meta <- ifelse(is.na(opvc$h_ent2), NA, opvc$property) 
+
+  opvc$h_value <- opvc$value
+  
+  opvc
+>>>>>>> 841a4b28d84447672fbba74239d20953e9c35c23
 }
