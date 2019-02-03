@@ -4,41 +4,39 @@ output:
   html_document: default
   word_document: default
 ---
-
-
-```{r}
+```{r echo=FALSE}
 # Load analysis functions (TODO: still not happy with the name... sba?)
 source('../../wda.R')
 source('../../obs.R')
 
-# Observations
-
-# TODO: Should be able to define links by presenting desc(ription)
-tobs <- rbind(
-  obs('DM.SERVICE.CONTROL>@ID|DM.MAPPING.DEFINITION=defined'),
-  obs('DM.SERVICE.SCHEDULER>DM.SERVICE.ID|DM.SERVICE.CONTROL=defined')
-)        
-
-# Initiate the analysis sequence
-dm <- analysis('DM Tool', 'tobs')
-
-grow(dm, 'DM.SERVICE.CONTROL')
+suppressWarnings(library(readxl))
 ```
 
 
+```{r}
+# Load observations
+dmo <- read_excel('../../data/tdm.xlsx')
 
-# Defined structure
+# Initiate the analysis sequence
+dm <- analysis('Temenos Data Migration Tool', 'dmo')
 
+```
+
+# Preparational structure
+
+*TODO: Add directories and files*
 
 ```{r fig.width=15, fig.height=10}
-
+(dm <- grow(dm, 'DM.PREREQUISITE', width = 2) %>%
+   grow('DM.PREREQUISITE', width = 0, depth = 1))
 ```
 
 # Observed structure
 
+*TODO: Adding values crashes*
 
 ```{r  fig.width=15, fig.height=10}
-
+(dm <- grow(dm, 'DM.PREREQUISITE', width = 2, depth = 1))
 ```
 
 ## Conclusions

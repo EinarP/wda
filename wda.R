@@ -1,5 +1,5 @@
 
-# TODO: Split into smaller files
+# TODO: Split into smaller files: sbat general & transformations
 # TODO: Use highlighting in (partitioning, sizing, etc.) error handling
 # TODO: Non-igraph layouts: trees, timelines?
 
@@ -80,6 +80,7 @@ trf <- function(sq, trans, cl, ...) {
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Add observations
 
+# TODO: Replace objsrc and objdest with h_ent, h_ent2 etc. and get rid of obs_wide
 trf_obs <- function(sq, new_obs, sq_name) {
   
   ang <- tail(sq, 1)[[1]]
@@ -617,6 +618,8 @@ center <- function(ang, ...) {
 #  lapply(aargs$elems, function(x)
 #    add_entities(x, aargs$width, attrs=aargs$attrs, vals=aargs$vals))
 
+# TODO: if ('h_ent') in colnames addEntity, addAttribute, addValue else oldstuff
+  
   elems <- aargs$elems
   for (idx in seq_along(elems)) {
     vals <- ifelse(grepl('=', elems[idx]), TRUE, aargs$vals)
@@ -754,7 +757,8 @@ add_link <- function(ang, vsrc, vdest, elabel=NA, etype='defined') {
   lattr <- list(width=1, contrast=FALSE)
   
   # Line type according to link type
-  lattr <- c(lattr, type=etype, lty=ifelse(etype=='scanned', 'dashed', 'solid'))
+  lattr <- c(lattr, type = etype, 
+    lty = ifelse(is.element(etype, c('weak', 'scanned')), 'dashed', 'solid'))
 
   # Create different types of links
   if (etype=='association') {

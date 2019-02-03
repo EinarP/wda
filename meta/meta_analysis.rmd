@@ -62,10 +62,10 @@ Alternatively, the observations can be added on the fly as part of the transform
 
 tbl <- rbind(
   c('O', 'O', 'NA', 'NA', 'O', 'NA', 'NA', 'NA'),
-  c('O>P', 'O', 'P', 'NA', 'O', 'NA', 'P', 'NA'),
-  c('O>P=V', 'O', 'P', 'V', 'O', 'NA', 'P', 'NA'),
-  c('O=V', 'O>id', 'NA', 'V', 'O', 'NA', 'NA', 'id'),
-  c('O>>M=V', 'O>M', 'NA', 'V', 'O', 'NA', 'NA', 'M'),
+  c('O=V', 'O', 'id', 'V', 'O', 'NA', 'NA', 'id'),
+  c('O>>M=V', 'O', 'M', 'V', 'O', 'NA', 'NA', 'M'),
+  c('O>P', 'O>P', 'value', 'NA', 'O', 'NA', 'P', 'NA'),
+  c('O>P=V', 'O>P', 'value', 'V', 'O', 'NA', 'P', 'NA'),
   c('O>P>M=V', 'O>P', 'M', 'V', 'O', 'NA', 'P', 'M'),
   c('O|O2', 'O>id|O2', 'type', 'weak', 'O', 'O2', 'id', 'type'),
   c('O>P|O2', 'O>P|O2', 'type', 'weak', 'O', 'O2', 'P', 'type'),
@@ -96,14 +96,17 @@ Helper fields *h_* will be added for observations table for convinience
 ```
 
 ## Sequence
-Progression of the analysis has a certain structure. Simple chain of incremental steps is preferable, but trees, circles, loops, etc. are possible as well. Each step  corresponds to a most appropriate (wholeness-extending) transformation
+Progression of the analysis has a certain structure. Simple chain of incremental steps is preferable, but trees, circles, loops, etc. are possible as well. Each step  corresponds to a most appropriate (wholeness-extending) transformation. Generative structure
 
 Starts with *analysis* and ends with *signoff*
 
 ```{r}
 # Polish the output with appropriate seed and partitioning
-(meta <- grow(meta, 'OBSERVATION', depth = 1, width = 0) %>% grow('SEQUENCE', width = 2) %>% 
-   applyPartitioning('mbrp') %>% applySeed(417))
+(meta <- grow(meta, 'OBSERVATION', depth = 1, width = 0) %>%
+   grow('SEQUENCE', width = 2) %>% 
+   applyPartitioning('mbrp') %>%
+   applySeed(890)
+)
 ```
 
 *TODO: Checkpoint and instance*
@@ -138,7 +141,9 @@ Optional Global Properties
 Creating order
 Local Properties
 
-### Center
+## Center
+Growing or trfansformations group 1 from table in Thesis: analysis, browseData, grow, void, getElements, signoff
+
 ```{r}
 # Source data (observations)
 sdata <- browseData(meta)
@@ -153,7 +158,9 @@ tdata[grepl('EDGE', tdata$name), ]
 
 ```
 
-### Grouping
+## Grouping (Creative encapsulation#@:?~@:{})
+*TODO: Groups may have aggregate attributes*
+
 ```{r}
 # Group GRAPH optional attributes
 gmbr <- paste0('GRAPH>', c('sizing', 'sizing2', 'checkpoint',
@@ -175,7 +182,7 @@ gmeta
 
 ```
 
-# Embedding
+## Embedding
 ```{r}
 # Identify key steps
 summary(gmeta)
@@ -183,6 +190,51 @@ summary(gmeta)
 # Finalize the grouping branch
 sqmain <- c('context', 'details', 'grouping')
 signoff(gmeta, thumb_seq=c(4, 7, 11), thumb_narr=sqmain)
+```
+
+## Dynamics
+This could be inference example as well
+
+*TODO: Archive and remove*
+```{r}
+# Facilitate reproducibility
+set.seed(3)
+
+# Generate sequences of 9 steps
+n <- 9
+steps <- 1:n
+
+# Simulate the assembly sequence
+asm <- unlist(lapply(steps, function(x) {
+  rep(x, x + 1 + abs(rnorm(1, 0, 2)))
+}))
+s <- data.frame(cbind(type=rep('assembly', length(asm)), count=asm))
+
+# Simulate the differentiation sequence
+dif <- unlist(lapply(steps, function(x) {
+  rep(x,  n * (n - x + abs(rnorm(1, 0, 2))))
+}))
+s <- rbind(s, cbind(type=rep('differentiation', length(dif)), count=dif))
+
+# Output using ggplot2 graphics system
+library(ggplot2)
+
+col <-'darkblue'
+lt <- 'dashed'
+ckpt <- c('baseline', 'checkpoint 1', 'checkpoint 2')
+
+# Build the barplot
+ggplot(s, aes(x=count, fill=type)) + stat_count(width=0.8, position='dodge') +
+  labs(x='steps', y='number of centers') + theme_grey(base_size=16) +
+  theme(legend.position="top", legend.text=element_text(size=16)) +
+
+  # Add checkpoints
+  geom_vline(aes(xintercept=0.5), color=col, linetype=lt, size=1) +
+  geom_text(aes(x=0.5, label=ckpt[1], y=100), hjust=-0.1, color=col, size=5) +
+  geom_vline(aes(xintercept=3.5), color=col, linetype=lt, size=1) +
+  geom_text(aes(x=3.5, label=ckpt[2], y=100), hjust=-0.1, color=col, size=5) +
+  geom_vline(aes(xintercept=5.5), color=col, linetype=lt, size=1) +
+  geom_text(aes(x=5.5, label=ckpt[3], y=100), hjust=-0.1, color=col, size=5)
 ```
 
 # Essential properties
@@ -343,45 +395,3 @@ meta
 
 ```
 
-# Dynamics
-*TODO: Archive and remove*
-```{r}
-# Facilitate reproducibility
-set.seed(3)
-
-# Generate sequences of 9 steps
-n <- 9
-steps <- 1:n
-
-# Simulate the assembly sequence
-asm <- unlist(lapply(steps, function(x) {
-  rep(x, x + 1 + abs(rnorm(1, 0, 2)))
-}))
-s <- data.frame(cbind(type=rep('assembly', length(asm)), count=asm))
-
-# Simulate the differentiation sequence
-dif <- unlist(lapply(steps, function(x) {
-  rep(x,  n * (n - x + abs(rnorm(1, 0, 2))))
-}))
-s <- rbind(s, cbind(type=rep('differentiation', length(dif)), count=dif))
-
-# Output using ggplot2 graphics system
-library(ggplot2)
-
-col <-'darkblue'
-lt <- 'dashed'
-ckpt <- c('baseline', 'checkpoint 1', 'checkpoint 2')
-
-# Build the barplot
-ggplot(s, aes(x=count, fill=type)) + stat_count(width=0.8, position='dodge') +
-  labs(x='steps', y='number of centers') + theme_grey(base_size=16) +
-  theme(legend.position="top", legend.text=element_text(size=16)) +
-
-  # Add checkpoints
-  geom_vline(aes(xintercept=0.5), color=col, linetype=lt, size=1) +
-  geom_text(aes(x=0.5, label=ckpt[1], y=100), hjust=-0.1, color=col, size=5) +
-  geom_vline(aes(xintercept=3.5), color=col, linetype=lt, size=1) +
-  geom_text(aes(x=3.5, label=ckpt[2], y=100), hjust=-0.1, color=col, size=5) +
-  geom_vline(aes(xintercept=5.5), color=col, linetype=lt, size=1) +
-  geom_text(aes(x=5.5, label=ckpt[3], y=100), hjust=-0.1, color=col, size=5)
-```
