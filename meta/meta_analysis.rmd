@@ -55,6 +55,10 @@ head(anobs)
 meta <- analysis('Meta-analysis', obs = 'anobs')
 ```
 
+*TODO: Long and wide format of observations*
+
+*TODO: Remove instance and <NA> columns and rename obsrc, etc. to h_ent, etc.*
+
 ### Textual definition
 Alternatively, the observations can be added on the fly as part of the transformation. For the latter, in a compact form defintion of observations can be handy:
 

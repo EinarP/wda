@@ -1,5 +1,5 @@
 ---
-title: "DM Tool"
+title: "TDM"
 output:
   html_document: default
   word_document: default
@@ -11,7 +11,7 @@ source('../../obs.R')
 
 suppressWarnings(library(readxl))
 ```
-
+This is a reverse analysis of Temenos Data Migration Tool and Methodology. It should facilitate passing T3DMG-R17 certification exam with no access to the tool and with no training. Instead the analysis had to rely on observations extracted from somewhat vague tool and methodology documentation:
 
 ```{r}
 # Load observations
@@ -19,29 +19,83 @@ dmo <- read_excel('../../data/tdm.xlsx')
 
 # Initiate the analysis sequence
 dm <- analysis('Temenos Data Migration Tool', 'dmo')
+```
+
+# Preparations
+Before processing three preparatory steps have to be completed
+
+## Record Counting
+Count records in target T24 system before migration by verifying DM.INFORMATION=SYSTEM record:
+
+```{r fig.width=20, fig.height=15}
+prep_centres <- c('DM.INFORMATION', 'DM.PREREQUISITE',  'DM.SERVICE.CONTROL')
+(dm <- grow(dm, prep_centres[1]) %>% grow(prep_centres[1], width = 0, depth = 2) %>%
+    applyAlternation)
+```
+
+Results should be tidied up for avoiding messy output:
+
+```{r}
+# Group count and remove non-actionable DM.INFORMATION attributes
+elems <- getElements(dm)$name
+dm <- group(dm, 'XX.LIVE.NAU.HIS.COUNT', elems[grepl('^DM.INF.*COUNT', elems)]) %>%
+  void(elems[grepl('DM.INFORMATION>', elems) & !grepl('COUNT|APPLICATION', elems)])
+```
+
+## Directory structure
+Create the directory structure (if not already present) for upload and extract files by verifying DM.PREREQUISITE records: 
+
+```{r fig.width=20, fig.height=15}
+(dm <- grow(dm, prep_centres[2]) %>% grow(prep_centres[2], width = 0, depth = 2))
+```
+
+Again, the results should be tidied up for avoiding messy output (perhads shoule have outputted earlier with value options first):
+
+```{r}
+desc_attr <- paste0('DM.PREREQUISITE>', c('DESCRIPTION', 'SELECT.LIST'))
+proc_attr <- paste0('DM.PREREQUISITE>', c('PROCESS', 'RECONCILIATION'))
+file_attr <- paste0('DM.PREREQUISITE>', c('FILE.CONV.REQD', 'FILE.LOAD.TYPE', 'CONVERSION.TYPE'))
+  
+# Void descriptive,  group process control and file specification attributes
+dm <- void(dm, desc_attr) %>% group('PROC.CONTROL', proc_attr) %>% group('FILE.SPEC', file_attr)
+```
+
+## Service control records
+Verification of DM.PREREQUISITE records may also create service control records:
+
+```{r fig.width=20, fig.height=15}
+(dm <- grow(dm, prep_centres[3]) %>% grow(prep_centres[3], width = 0, depth = 2))
+```
+
+For tidy up group attributes:
+
+```{r}
+srv_ctrl <- paste0('DM.SERVICE.CONTROL>',
+  c('SERVER.NAME', 'USER', 'NO.OF.SESSIONS', 'RUN.STATUS', 'DSC.TYPE', 'PRE.PROCESS'))
+
+srv_logs <- paste0('DM.SERVICE.CONTROL>', 
+  c('MOVE.TO.HIST', 'CONTROL.LOG', 'ERROR.DETAILS', 'NO.OF.ERROR', 'TYPE.OF.ERROR', 'DATE', 'STARTED', 'STOPPED', 'ELAPSED'))
+
+dm <- group(dm, 'SERVICE.CONTROL', srv_ctrl) %>% group('SERVICE.LOGS', srv_logs)
 
 ```
 
-# Preparational structure
+# Data loading
 
-*TODO: Add directories and files*
+Verify DATA.MAPPING.VERIFICATION to check the file first, then DM.SERVICE.CONTROL
 
-```{r fig.width=15, fig.height=10}
-(dm <- grow(dm, 'DM.PREREQUISITE', width = 2) %>%
-   grow('DM.PREREQUISITE', width = 0, depth = 1))
+```{r  fig.width=20, fig.height=15}
+(dmm <- grow(dm, 'DM.MAPPING.DEFINITION', width = 2) %>%
+   removeAlternation %>% applySeed(133))
 ```
 
-# Observed structure
+# Extraction structure
 
-*TODO: Adding values crashes*
+Load all entities
 
-```{r  fig.width=15, fig.height=10}
-(dm <- grow(dm, 'DM.PREREQUISITE', width = 2, depth = 1))
-```
+# Conclusions
 
-## Conclusions
-
-What can we conclude based on analysis (or in word only?)
+What can we conclude based on analysis
 
 ```{r fig.width=15, fig.height=10}
 
