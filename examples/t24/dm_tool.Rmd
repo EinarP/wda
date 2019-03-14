@@ -1,7 +1,8 @@
 ---
 title: "TDM"
 output:
-  html_document: default
+  html_document:
+    number_sections: true
   word_document: default
 ---
 ```{r echo=FALSE}
@@ -11,7 +12,7 @@ source('../../obs.R')
 
 suppressWarnings(library(readxl))
 ```
-This is a reverse analysis of Temenos Data Migration Tool and Methodology. It should facilitate passing T3DMG-R17 certification exam with no access to the tool and with no training. Instead the analysis had to rely on observations extracted from somewhat vague tool and methodology documentation:
+This is a reverse analysis of Temenos Data Migration Tool and Methodology for migrating data into and from T24. It should facilitate passing T3DMG-R17 certification exam without ever seeing the tool and with no training. Instead the analysis had to rely on observations extracted from somewhat vague tool and methodology documentation:
 
 ```{r}
 # Load observations
@@ -21,83 +22,290 @@ dmo <- read_excel('../../data/tdm.xlsx')
 dm <- analysis('Temenos Data Migration Tool', 'dmo')
 ```
 
-# Preparations
-Before processing three preparatory steps have to be completed
+Different kind of entities have been observed and these should be differentiated in the structure. As of now, documents left out for simplicity sake. Analysis will be  quite detailed nevertheless and the alternating presentation of elements useful:
 
-## Record Counting
+```{r}
+# Partition to clusters by membership and turn on alternation property
+dm <- applyPartitioning2(dm, 'mbrp') %>% applyAlternation
+
+# Available entity types
+table(browseData(dm)$mbrp)
+```
+
+# Mapping
+What to upload or extract has to be specified. Possibly with the help of specific mapping programs
+
+## Extract mapping
+Start to grow the structure from central extract mapping table:
+
+```{r fig.width=18, fig.height=18}
+# Collect mapping centres
+map_centres <- extract_centre <- 'DM.EXTRACTOR'
+
+# Generate the structure
+dm <- grow(dm, extract_centre) %>%
+  grow(extract_centre, depth = 2, width = 0)
+
+# Plot by higlighting the mapping centres
+applyHighlight(dm, extract_centre)
+```
+
+Simplify the structure by removing non-actionable fields and by grouping similar attributes to avoid overly busy output:
+
+```{r fig.width=20, fig.height=20}
+# Fetch the extracting centre attribute names
+dmea <- grep(paste0(extract_centre, '>'), getElements(dm)$name, value = TRUE)
+
+# Remove descriptive or helper attributes
+dm <- void(dm, grep('DESCRIPTION|SELECT', dmea, value = TRUE)) %>%
+  
+  # Merge the extract selection criteria attributes
+  group('SELECTION', grep('COMP|FILE.TYPE|SEL\\.', dmea, value = TRUE)) %>%
+
+  # Merge the extract specification attributes
+  group('EXTRACT_SPEC', grep('OFS|DELIM|HEAD', dmea, value = TRUE)) %>%
+
+  # Merge the extract field attributes
+  group('EXTRACT_FIELDS', grep('FLD\\.|TRANS\\.', dmea, value = TRUE)) %>%
+
+  # Merge data capture attributes
+  group('DATA_CAPTURE', grep('LOCAL|DC|CAPTURE|TRANSACTION\\.', dmea, value = TRUE))
+```
+
+## Upload mapping
+Add central upload mapping table to structure:
+
+```{r fig.width=20, fig.height=20}
+# Collect mapping centres
+map_centres <- c(map_centres, upload_centre <- 'DM.MAPPING.DEFINITION')
+
+# Generate the structure
+dm <- grow(dm, upload_centre) %>%
+  grow(upload_centre, depth = 2, width = 0)
+
+# Plot by higlighting the mapping centres
+applyHighlight(dm, upload_centre) %>% applySeed(277)
+```
+
+Group the attributes to avoid overly busy output:
+
+```{r fig.width=20, fig.height=20}
+# Fetch the upload mapping centre attribute names
+dmda <- grep(paste0(upload_centre, '>'), getElements(dm)$name, value = TRUE)
+
+# Remove descriptive or helper attributes
+dm <- void(dm, grep('DESCRIPTION|SELECT', dmda, value = TRUE)) %>%
+
+  # Merge the upload specification attributes
+  group('UPLOAD_SPEC', grep('TYPE|OFS|DATA|DELIM|SEQ|RTN', dmda, value = TRUE)) %>%
+
+  # Merge the upload field specification attributes
+  group('UPLOAD_FIELDS', grep('ID|FIELD', dmda, value = TRUE))
+```
+
+## Mapping helpers
+Manually populating mapping tables is a laborious undertaking. Some helper utilities seem to exist for supporting this:
+
+* AUTO.DMD.CREATION service seems to be only utility which populates mapping tables directly
+* TDM.DATA.STRUCTURE.EXTRACT extracts the structures of the traditional application.
+* DM.AA.MAPPING extracts AA products with respective properties into AA.DMS.OUT directory
+* DM.AA.EXTRACT and DE.MAPPING.EXTRACT are mentioned but their usage is unclear 
+
+Expand mapping helpers which have data presentation:
+
+```{r fig.width=22, fig.height=22}
+map_helper_centres <- c('DM.AA.MAPPING', 'DM.AA.EXTRACT', 'DM.MAPPING.EXTRACT')
+
+# Generate the structure
+dm <- grow(dm, map_helper_centres) %>%
+  grow(map_helper_centres, depth = 2, width = 0)
+
+# Plot by higlighting the mapping centres
+applyHighlight(dm, map_helper_centres) %>% applySeed(44)
+```
+
+Group the attributes to avoid overly busy output:
+
+```{r fig.width=20, fig.height=20}
+# Collect mapping centres
+map_centres <- c(map_centres, map_helper_name <- 'MAPPING_HELPER')
+
+# Group related elements
+elems <- getElements(dm)$name
+
+dm <- group(dm, map_helper_name, 
+  elems[grepl('DM.AA|MAPPING.EXTRACT', elems) & !grepl('id|OUTPUT|APPL', elems)])
+```
+
+*TODO: group should preserve outgoing attributes if alternation is on*
+
+## Mapping summary
+Final structure for mapping phase identified with centres highlighted:
+
+```{r fig.width=20, fig.height=20}
+applyHighlight(dm, map_centres)
+```
+
+Linked elements not explained will be tackled in later phases
+
+# Preprocessing
+After mapping three preparatory steps should be completed before loading and extracting the data
+
+## Record counting
 Count records in target T24 system before migration by verifying DM.INFORMATION=SYSTEM record:
 
-```{r fig.width=20, fig.height=15}
-prep_centres <- c('DM.INFORMATION', 'DM.PREREQUISITE',  'DM.SERVICE.CONTROL')
-(dm <- grow(dm, prep_centres[1]) %>% grow(prep_centres[1], width = 0, depth = 2) %>%
-    applyAlternation)
+```{r fig.width=20, fig.height=20}
+prep_centres <- 'RECORD_COUNTS'
+count_centre <- 'DM.INFORMATION'
+
+dm <- grow(dm, count_centre) %>%
+  grow(count_centre, width = 0, depth = 2)
+
+applyHighlight(dm, count_centre)
 ```
+
+*TODO: DM.INFORMATION value SYSTEM not displayed*
 
 Results should be tidied up for avoiding messy output:
 
 ```{r}
-# Group count and remove non-actionable DM.INFORMATION attributes
+# Group count and remove non-actionable attributes
 elems <- getElements(dm)$name
-dm <- group(dm, 'XX.LIVE.NAU.HIS.COUNT', elems[grepl('^DM.INF.*COUNT', elems)]) %>%
-  void(elems[grepl('DM.INFORMATION>', elems) & !grepl('COUNT|APPLICATION', elems)])
+
+(count_attrs <- elems[grepl('^DM.INF.*COUNT', elems)])
+(nact_attrs <- elems[grepl('DM.INFORMATION>', elems) & !grepl('COUNT|APPLICATION', elems)])
+dm <- group(dm, 'XX.LIVE.NAU.HIS.COUNT', count_attrs) %>% void(nact_attrs)
 ```
 
 ## Directory structure
-Create the directory structure (if not already present) for upload and extract files by verifying DM.PREREQUISITE records: 
+Create the directory structure (if not already present) for upload and extract files by verifying DM.PREREQUISITE records:
+```{r fig.width=20, fig.height=20}
+prep_centres <- c(prep_centres, dmp <- 'DM.PREREQUISITE')
 
-```{r fig.width=20, fig.height=15}
-(dm <- grow(dm, prep_centres[2]) %>% grow(prep_centres[2], width = 0, depth = 2))
+# Generate the structure with file system objects
+dm <- grow(dm, dmp) %>% grow(dmp, width = 0, depth = 2)
+
+applyHighlight(dm, dmp)
 ```
+Again, the results should be tidied up for avoiding messy output:
+```{r fig.width=20, fig.height=20}
+# Select elements from overly detailed structure for clean-up
+elems <- subset(getElements(dm), grepl(paste0(prep_centres[2], '>'), name), c('name', 'label'))
 
-Again, the results should be tidied up for avoiding messy output (perhads shoule have outputted earlier with value options first):
-
-```{r}
-desc_attr <- paste0('DM.PREREQUISITE>', c('DESCRIPTION', 'SELECT.LIST'))
-proc_attr <- paste0('DM.PREREQUISITE>', c('PROCESS', 'RECONCILIATION'))
-file_attr <- paste0('DM.PREREQUISITE>', c('FILE.CONV.REQD', 'FILE.LOAD.TYPE', 'CONVERSION.TYPE'))
+(desc_attr <- elems[grep('DESCRIPTION|SELECT.LIST', elems$name), ])
+(proc_attr <- elems[grep('PROCESS|RECONCILIATION', elems$name), ])
+(file_attr <- elems[grep('CONV|TYPE', elems$name), ])
   
 # Void descriptive,  group process control and file specification attributes
-dm <- void(dm, desc_attr) %>% group('PROC.CONTROL', proc_attr) %>% group('FILE.SPEC', file_attr)
+dm <- void(dm, desc_attr$name) %>%
+  group('PROC.CONTROL', proc_attr$name) %>%
+  group('FILE.SPEC', file_attr$name)
 ```
 
-## Service control records
+*TODO: Fix proc_attr print*
+
+Group all counting elements to make space for new elements:
+```{r}
+count_elems <- c('DATA.MIG.COUNT', 'DATA.MIG.COUNT>id','DM.INFORMATION', 'XX.LIVE.NAU.HIS.COUNT')
+dm <- group(dm, 'RECORD_COUNTS', count_elems)
+```
+
+## Service control
 Verification of DM.PREREQUISITE records may also create service control records:
 
-```{r fig.width=20, fig.height=15}
-(dm <- grow(dm, prep_centres[3]) %>% grow(prep_centres[3], width = 0, depth = 2))
+```{r fig.width=20, fig.height=20}
+prep_centres <- c(prep_centres, dsc <- 'DM.SERVICE.CONTROL')
+
+dm <- grow(dm, dsc, width = 0, depth = 2)
+
+applyHighlight(dm, dsc)
 ```
 
-For tidy up group attributes:
+Tidy up by group attributes again and output the structure after preparation steps:
+
+```{r fig.width=20, fig.height=20}
+elems <- subset(getElements(dm), grepl(paste0(prep_centres[3], '>'), name), c('name', 'label'))
+
+(ctrl_attrs <- elems[grep('SERVER|USER|SESSIONS|STATUS|DSC|PROCESS', elems$name), ])
+(log_attrs <- elems[grep('HIST|LOG|ERROR|DATE|STARTED|STOPPED|ELAPSED', elems$name), ])
+dm <- group(dm, 'SERVICE.CONTROL', ctrl_attrs$name) %>% group('SERVICE.LOGS', log_attrs$name)
+```
+
+## Preparations summary
+
+```{r fig.width=20, fig.height=20}
+applyHighlight(dm, prep_centres)
+```
+
+# Migration
+
+## Extracting
+
+```{r fig.width=23, fig.height=23}
+
+(dm <- grow(dm, c('DM.SERVICE.CONTROL', 'DM.SERVICE.CONTROL.CONCAT')) %>%
+  grow('DM.SERVICE.SCHEDULER', depth = 2, width = 0))
+
+group(dm, 'TSA', c('TSA.SERVICE', 'BATCH', 'TSA.WORKLOAD.PROFILE'))
+
+#SERVICE_CONTROL group:
+#'DM.SERVICE.CONTROL', 'DM.SERVICE.CONTROL.CONCAT>', 'DM.SERVICE.SCHEDULER>' 
+ 
+#c('DM.SERVICE.CONTROL', 'DM.SERVICE.CONTROL.CONCAT', 'DM.SERVICE.SCHEDULER', 'TSA.SERVICE', 'BATCH', 'TSA.WORKLOAD.PROFILE'
+
+#exclude: id, XX.CURRENT.DIRECTORY, XX.NEW.DIRECTORY, FLAT.FILE.DIR, ERROR.FILE.PATH, UPLOAD.COMPANY, ERROR.FILE.NAME
+
+
+#elems <- getElements(dm)$name
+#dm <- group(dm, map_helper_name,
+#elems[grepl('DM.AA|MAPPING.EXTRACT', elems) & !grepl('id|OUTPUT|APPL', elems)])
+
+```
+
+DM.MAPPING.EXTRACT?
+
+## Uploading
+Mapping the source system data to target system and then attempting to upload
+
+Verification of a DM.DATA.TRANSLATION record converts incoming file to a format suitable for mapping:
+
+DMV directories created by DM.PREREQUISITE, so verification part of loading. Verify DATA.MAPPING.VERIFICATION to check the file first against DM.MAPPING.DEFINITION
+
+```{r fig.width=20, fig.height=20}
+
+# dm <- grow(dm, 'DM.DATA.TRANSLATION') %>% grow('DM.DATA.TRANSLATION', depth = 2, width = 0)
+
+#(dm <- grow(dm, 'DATA.MAPPING.VERIFICATION'))
+
+```
+
+*TODO: Group DMD to tidy up*
+
+Then DM.SERVICE.CONTROL. Group to TSS, BATCH, etc.
+
+```{r fig.width=20, fig.height=20}
+```
+
+# Reconciliation
+
+
+# Conclusion
+
+*TODO: Entities observed as destination only not uncovered below*
+
+Check if all entities covered:
 
 ```{r}
-srv_ctrl <- paste0('DM.SERVICE.CONTROL>',
-  c('SERVER.NAME', 'USER', 'NO.OF.SESSIONS', 'RUN.STATUS', 'DSC.TYPE', 'PRE.PROCESS'))
-
-srv_logs <- paste0('DM.SERVICE.CONTROL>', 
-  c('MOVE.TO.HIST', 'CONTROL.LOG', 'ERROR.DETAILS', 'NO.OF.ERROR', 'TYPE.OF.ERROR', 'DATE', 'STARTED', 'STOPPED', 'ELAPSED'))
-
-dm <- group(dm, 'SERVICE.CONTROL', srv_ctrl) %>% group('SERVICE.LOGS', srv_logs)
-
+elems <- getElements(dm)
+dm_entities <- elems[elems$type == 'entity','name']
+obs_entities <- browseEntities(dm)$h_ent
+obs_entities[!is.element(obs_entities, dm_entities)]
 ```
-
-# Data loading
-
-Verify DATA.MAPPING.VERIFICATION to check the file first, then DM.SERVICE.CONTROL
-
-```{r  fig.width=20, fig.height=15}
-(dmm <- grow(dm, 'DM.MAPPING.DEFINITION', width = 2) %>%
-   removeAlternation %>% applySeed(133))
-```
-
-# Extraction structure
-
-Load all entities
-
-# Conclusions
 
 What can we conclude based on analysis
 
-```{r fig.width=15, fig.height=10}
-
+```{r fig.width=20, fig.height=20}
+# (dmm <- removeAlternation(dm) %>% applySeed(133))
 ```
 
+*TODO: Fix removeAlternation issue (RECORD_COUNTS must be be the reason*

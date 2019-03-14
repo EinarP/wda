@@ -80,7 +80,7 @@ trf <- function(sq, trans, cl, ...) {
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Add observations
 
-# TODO: Replace objsrc and objdest with h_ent, h_ent2 etc. and get rid of obs_wide
+# TODO: Replace objdest with h_ent2 etc.
 trf_obs <- function(sq, new_obs, sq_name) {
   
   ang <- tail(sq, 1)[[1]]
@@ -122,8 +122,8 @@ trf_obs <- function(sq, new_obs, sq_name) {
         sub('\\|', '>', x)
     })
     hc <- strsplit(hc, '>', fixed=TRUE)
-    obsw$objsrc <- sapply(hc, function(x) x[1])
-    obsw$objattr <- sapply(hc, function(x) x[2])
+    obsw$h_ent <- sapply(hc, function(x) x[1])
+    obsw$h_attr <- sapply(hc, function(x) x[2])
     obsw$objdest <- sapply(hc, function(x) x[3])
     
     # Tidy up
@@ -377,12 +377,12 @@ plot_ang <- function(ang, xlab=NULL, main=NULL) {
 
   # Shapes corresponding to vertex type
   V(ang)[V(ang)$type=='entity']$shape <- 'square'
-  V(ang)[V(ang)$type=='egroup']$shape <- 'fsquare'
+  V(ang)[V(ang)$type=='ent_group']$shape <- 'fsquare'
   V(ang)[V(ang)$type=='attribute']$shape <- 'circle'
-  V(ang)[V(ang)$type=='agroup']$shape <- 'fcircle' 
+  V(ang)[V(ang)$type=='attr_group']$shape <- 'fcircle' 
   
   V(ang)$frame.color <- thmopt$vertex_frame_color
-  V(ang)[!V(ang)$type %in% c('egroup','agroup')]$frame.color <- NA
+  V(ang)[!V(ang)$type %in% c('ent_group','attr_group')]$frame.color <- NA
   V(ang)$frame.width <- thmopt$vertex_frame_width
     
   # Simplified/full presentation
@@ -441,9 +441,9 @@ plot_ang <- function(ang, xlab=NULL, main=NULL) {
   # Adjust element sizes
   if (is.na(ang$sizing)) {
     V(ang)[V(ang)$type=='entity']$size <- thmopt$entity_size
-    V(ang)[V(ang)$type=='egroup']$size <- thmopt$egroup_size
+    V(ang)[V(ang)$type=='ent_group']$size <- thmopt$ent_group_size
     V(ang)[V(ang)$type=='attribute']$size <- thmopt$attribute_size
-    V(ang)[V(ang)$type=='agroup']$size <- thmopt$agroup_size
+    V(ang)[V(ang)$type=='attr_group']$size <- thmopt$attr_group_size
   } else {
     # TODO: Adjust different types differently
 #    maxsize <- max(V(ang)$size)
@@ -474,7 +474,7 @@ plot_ang <- function(ang, xlab=NULL, main=NULL) {
   V(ang)[hl_idx]$label.cex <- thmopt$vertex_contrast_label_cex
   
   # Label sizes in different elements
-  V(ang)[V(ang)$type=='attribute']$label.cex <- 0.8
+  V(ang)[V(ang)$type %in% c('attribute', 'attr_group')]$label.cex <- 0.8
   
   # Output a graph or a graph with community
   if (is.na(ang$partitioning) | !is.na(ang$simplicity)) {
@@ -544,11 +544,11 @@ browseData <- function(sq, ckpt=NULL) {
 }
 
 browseEntities <- function(sq, ckpt=NULL) {
-  subset(browseData(sq, ckpt), is.na(objattr))
+  subset(browseData(sq, ckpt), is.na(h_attr))
 }
 
 browseAttributes <- function(sq, ckpt=NULL) {
-  subset(browseData(sq, ckpt), !is.na(objattr) & is.na(objdest))
+  subset(browseData(sq, ckpt), !is.na(h_attr) & is.na(objdest))
 }
 
 # TODO: Implement function
@@ -565,16 +565,16 @@ browseDataTable <- function(sq, object, checkpoint = NULL, instance = NULL) {
 
   # TODO: If object is a link, dest must be present
   sq_data <- browseData(sq)
-  sq_data <- sq_data[sq_data$objsrc == object & is.na(sq_data$objdest), ]
+  sq_data <- sq_data[sq_data$h_ent == object & is.na(sq_data$objdest), ]
   
   # Present in wide format
-  sqdw <- sq_data[!is.na(sq_data$value),c('checkpoint', 'instance', 'objattr', 'value')]
-  sqdw <- spread(sqdw, objattr, value)
+  sqdw <- sq_data[!is.na(sq_data$value),c('checkpoint', 'instance', 'h_attr', 'value')]
+  sqdw <- spread(sqdw, h_attr, value)
   
   # Apply data types
   if ('type' %in% colnames(sq_data)) {
     lapply(colnames(sqdw), function (x) {
-        col_type <- sq_data[!is.na(sq_data$type) & sq_data$objattr == x, 'type']
+        col_type <- sq_data[!is.na(sq_data$type) & sq_data$h_attr == x, 'type']
         if (length(col_type)) {
           sqdw[ ,x] <<- do.call(paste0('as.', col_type), list(sqdw[ ,x]))
         }
@@ -612,7 +612,7 @@ center <- function(ang, ...) {
   tmpobs <<- browseRelations(ang)
   
   # Arbitrary attributes
-  aargs <- list(...)
+  dots <- list(...)
   
 # Process the vector of center names
 #  lapply(aargs$elems, function(x)
@@ -620,13 +620,13 @@ center <- function(ang, ...) {
 
 # TODO: if ('h_ent') in colnames addEntity, addAttribute, addValue else oldstuff
   
-  elems <- aargs$elems
+  elems <- dots$elems
   for (idx in seq_along(elems)) {
-    vals <- ifelse(grepl('=', elems[idx]), TRUE, aargs$vals)
+    vals <- ifelse(grepl('=', elems[idx]), TRUE, dots$vals)
     if (grepl('>', elems[idx])) {
       add_attributes(tmpang, elems[idx], vals = vals, atype = 'attribute')    
     } else {
-      add_entities(elems[idx], aargs$width, attrs = aargs$attrs, vals = vals)
+      add_entities(elems[idx], dots$width, attrs = dots$attrs, vals = vals)
     }
   }
   
@@ -637,7 +637,7 @@ center <- function(ang, ...) {
 # Add centers and their neighbors
 add_entities <- function(center, width, attrs, vals) {
   
-  obslnk <- tmpobs[tmpobs$objsrc==center | tmpobs$objdest==center, ]
+  obslnk <- tmpobs[tmpobs$h_ent==center | tmpobs$objdest==center, ]
   
   # Add entity if not present
   if (!is.element(center, V(tmpang)$name)) {
@@ -653,7 +653,7 @@ add_entities <- function(center, width, attrs, vals) {
   if (nrow(obslnk) > 0) {
     apply(obslnk, 1, function(clnk) {
       
-        nextcenter <- ifelse(clnk['objsrc']==center, clnk['objdest'], clnk['objsrc'])
+        nextcenter <- ifelse(clnk['h_ent']==center, clnk['objdest'], clnk['h_ent'])
       
         if (width > 0) {
           add_entities(nextcenter, width-1, attrs, vals)
@@ -662,8 +662,8 @@ add_entities <- function(center, width, attrs, vals) {
         # TODO: Convert an attribute to a link if present
         entities <- getElements(tmpang, ctype='entity')$name
         if (nextcenter %in% entities) {
-          tmpang <<- add_link(tmpang, clnk['objsrc'],
-            clnk['objdest'], elabel=clnk['objattr'], etype=clnk['type'])
+          tmpang <<- addLink(tmpang, clnk['h_ent'],
+            clnk['objdest'], elabel=clnk['h_attr'], etype=clnk['type'])
         }
     })
   }
@@ -677,12 +677,12 @@ add_attributes <- function(ang, centers, vals=FALSE, atype='attribute') {
   
   # Either an attribute or related entity can be passed
   if (grepl('>', centers)) {
-    objsrc <- sub('>.*', '', centers)
-    objattr <- sub('.*>', '', centers)
-    attrspec <- data.frame(object=centers, objsrc=objsrc, objattr=objattr)
+    h_ent <- sub('>.*', '', centers)
+    h_attr <- sub('.*>', '', centers)
+    attrspec <- data.frame(object=centers, h_ent=h_ent, h_attr=h_attr)
   } else {
     obs <- browseAttributes(tmpang)
-    attrspec <- obs[is.element(obs$objsrc, centers), ]
+    attrspec <- obs[is.element(obs$h_ent, centers), ]
   }
   
   # Add all attributes if not already present
@@ -690,14 +690,14 @@ add_attributes <- function(ang, centers, vals=FALSE, atype='attribute') {
     
     links <- getRelations(ang)
     apply(attrspec, 1, function(cattr) {
-      src <- cattr['objsrc']
+      src <- cattr['h_ent']
       anames <- links[grepl(paste0(src, '\\|'), links$name), 'name']
       alabels <- links[grepl(paste0(src, '\\|'), links$name), 'label']
       newattr <- unname(cattr['object'])
       attrlink <- paste(src, newattr, sep='|')
       if (!attrlink %in% anames) {
-        if (!(!is.na(tmpang$simplicity) & cattr['objattr'] %in% alabels)) {
-          newlabel <- unname(cattr['objattr'])
+        if (!(!is.na(tmpang$simplicity) & cattr['h_attr'] %in% alabels)) {
+          newlabel <- unname(cattr['h_attr'])
           if (!newattr %in% V(ang)$name) {
             
             # Don't add if link exists
@@ -707,7 +707,7 @@ add_attributes <- function(ang, centers, vals=FALSE, atype='attribute') {
               aattr <- list(name=newattr, label=newlabel)
               aattr <- c(aattr, type=atype, contrast=FALSE)
               ang <<- add_vertices(tmpang, 1, attr=aattr)
-              tmpang <<- add_link(ang, src, newattr, etype='association')
+              tmpang <<- addLink(ang, src, newattr, etype='association')
             }
           }
         }
@@ -745,39 +745,34 @@ add_values <- function(ang, centers) {
 }
 
 # Connect vertices
-# TODO: Scanned and defined or smth like fixed and flexible?
-add_link <- function(ang, vsrc, vdest, elabel=NA, etype='defined') {
+# TODO: Convert attribute to link if already exists?
+addLink <- function(ang, vsrc, vdest, elabel = NA, etype = 'defined') {
   
   elabel <- unname(elabel)
   etype <- unname(etype)
   
-  # TODO: Convert attribute to link if already exists
-  
-  # TODO: Link width
-  lattr <- list(width=1, contrast=FALSE)
-  
-  # Line type according to link type
-  lattr <- c(lattr, type = etype, 
-    lty = ifelse(is.element(etype, c('weak', 'scanned')), 'dashed', 'solid'))
-
+  link_attr <- list(width = 1,
+    lty = ifelse(is.element(etype, c('weak', 'scanned')), 'dashed', 'solid'),
+    arrow.mode = ifelse(etype == 'association', 0, 2),
+    contrast = FALSE,
+    type = etype
+  )
+ 
   # Create different types of links
-  if (etype=='association') {
-    lattr <- c(lattr, arrow.mode=0)
-    ang <- add.edges(ang, c(vsrc,vdest), attr=lattr)
+  if (etype == 'association') {
+    ang <- add.edges(ang, c(vsrc, vdest), attr = link_attr)
   } else {
     if (ang$alternation) {
-      linkname <- paste(paste(vsrc, elabel, sep='>'), vdest, sep='|')  
-      if (!is.element(linkname, attr(E(ang), 'vnames'))) {
+      link_name <- paste(paste(vsrc, elabel, sep='>'), vdest, sep='|')  
+      if (!is.element(link_name, attr(E(ang), 'vnames'))) {
         newattr <- paste(vsrc, elabel, sep='>')
         ang <- add_attributes(ang, newattr)
-        lattr <- c(lattr, arrow.mode=2)
-        ang <- add.edges(ang, c(newattr,vdest), attr=lattr)
+        ang <- add.edges(ang, c(newattr, vdest), attr = link_attr)
       }
     } else {
-      linkname <- paste(vsrc, vdest, sep='|')  
-      if (!is.element(linkname, attr(E(ang), 'vnames'))) {
-        lattr <- c(lattr, label=elabel, arrow.mode=2)
-        ang <- add.edges(ang, c(vsrc,vdest), attr=lattr)
+      link_name <- paste(vsrc, vdest, sep='|')  
+      if (!is.element(link_name, attr(E(ang), 'vnames'))) {
+        ang <- add.edges(ang, c(vsrc,vdest), attr = c(link_attr, label = elabel))
         
         # Delete source attribute if present
         srca <- paste(vsrc, elabel, sep='>')
@@ -869,59 +864,61 @@ removePartitioning2 <- function(sq) {
 # Add boundary
 partitioning <- function(ang, ...) {
 
-  # TODO: Support grouping before setting the membership
-  comm_idx <- V(ang)[V(ang)$type %in% c('entity', 'attribute')]
-
-  comm <- get_communities(ang, ang$partitioning)
-  V(ang)$membership[comm_idx] <- comm[comm_idx]
-
   # TODO: Not most efficient to always reapply both
-  comm <- get_communities(ang, ang$partitioning2)
-  V(ang)$membership2[comm_idx] <- comm[comm_idx]
+  V(ang)$membership <- getCommunities(ang, ang$partitioning, V(ang)$membership)
+  V(ang)$membership2 <- getCommunities(ang, ang$partitioning2, V(ang)$membership2)
 
   ang
 }
 
-get_communities <- function(ang, method) {
+getCommunities <- function(ang, method, membership) {
   
-  if (is.na(method)) {
-    comm <- NA
-  } else {
+  # Fetch of clear community information
+  if (!is.na(method)) {
+
+    # Apply community detection algorithm
     if (existsFunction(method)) {
     
-      # Apply community detection algorithm
       res <- do.call(method, list(ang))
       comm <- res$membership
+      
+    # Use pregiven communities
     } else {
 
-      # Use pregiven communities    
       obsw <- browseData(ang, 'all')
       ocomm <- obsw[!is.na(obsw[ ,method]),c('object',method)]
       if (nrow(ocomm)) {
         
-        # Presume that only entities have membership defined
-        ents <- sub('>.*', '', V(ang)$name)
-        comm <- ocomm[match(ents, ocomm$object),method]
-
-        # Some attributes may have membership defined as well     
-        ocomm <- ocomm[match(V(ang)$name, ocomm$object),method]
-
-        # Use entity membership if attribute membership not defined
-        comm <- apply(cbind(comm, ocomm), 1, function(x) {
-          ifelse(sum(is.na(x)), x[1], x[2])
-        })
+        # Observed membership
+        obs_comm <- ocomm[match(V(ang)$name, ocomm$object), method]
+        
+        # Use entity membership if no observations 
+        ent_comm <- ocomm[match(sub('>.*', '', V(ang)$name), ocomm$object),method]
+        comm <- ifelse(is.na(obs_comm), ent_comm, obs_comm)
+        
+        # Use existing membership for groups
+        if (!is.null(membership)) {
+          comm <- ifelse(V(ang)$type %in% c('entity', 'attribute'), comm, membership)
+        }
       } else {
         stop('No memberships pregiven.')
       }
     }
     
     # Avoid crashing if vertex without membership present
-    comm[is.na(comm)] <- 'ERR'  
-  }
+    comm[is.na(comm)] <- 'ERR'
+    
+  } else {
+    
+    comm <- NA
+  } 
+  
   comm
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# TODO: This could return also colors/clusters matched to membership. Kind of legend
 
 # Get current partitioning algorithm or source data
 getPartitionings <- function(sq) {
@@ -960,12 +957,12 @@ scale <- function(ang, ...) {
 
 # User-friendly function call for alternating
 applyAlternation <- function(sq) {
-  trf(sq, 'alternation', alternation=TRUE, cl=match.call())
+  trf(sq, 'alternation', alternation = TRUE, cl = match.call())
 }
 
 # User-friendly function call removing alternation
 removeAlternation <- function(sq) {
-  trf(sq, 'alternation', alternation=FALSE, cl=match.call())
+  trf(sq, 'alternation', alternation = FALSE, cl = match.call())
 }
 
 # Transformation function
@@ -977,7 +974,7 @@ alternation <- function(ang, ...) {
     
     for(idx in seq_along(E(ang))) {  
     
-      objsrc <- sub('\\|.*', '', attr(E(ang)[idx], 'vnames'))
+      h_ent <- sub('\\|.*', '', attr(E(ang)[idx], 'vnames'))
       objdest <- sub('.*\\|', '', attr(E(ang)[idx], 'vnames'))
     
       # Add new links and mark obsolete edges/vertices for deletion
@@ -985,7 +982,7 @@ alternation <- function(ang, ...) {
         
         objlbl <- E(ang)[idx]$label
         objtype <- E(ang)[idx]$type
-        ang <- add_link(ang, objsrc, objdest, elabel=objlbl, etype=objtype)
+        ang <- addLink(ang, h_ent, objdest, elabel=objlbl, etype=objtype)
         
         E(ang)[idx]$label <- 'DELETE'
       }
@@ -1001,7 +998,7 @@ alternation <- function(ang, ...) {
     for(idx in 1:nrow(el)) {
       src <- sub('>.*', '', el[idx,1])
       label <- sub('.*>', '', el[idx,1])
-      ang <- add_link(ang, src, el[idx,2], elabel=label)
+      ang <- addLink(ang, src, el[idx,2], elabel=label)
     } 
   }
   
@@ -1268,10 +1265,10 @@ group_trf <- function(ang, ...) {
     gidxb <- gidx=='isgroupmember'
     ang <- set_vertex_attr(ang, 'name', index=gidxb, value=grp_name)
     if (grepl('>', grp_members[1])) {
-      ang <- set_vertex_attr(ang, 'type', index=gidxb, value='agroup')
+      ang <- set_vertex_attr(ang, 'type', index=gidxb, value='attr_group')
       grp_label <- sub('.*>', '', grp_name)
     } else {
-      ang <- set_vertex_attr(ang, 'type', index=gidxb, value='egroup')
+      ang <- set_vertex_attr(ang, 'type', index=gidxb, value='ent_group')
       ang <- set_vertex_attr(ang, 'label', index=gidxb, value=grp_name)
       grp_label <- grp_name
     }
@@ -1279,13 +1276,13 @@ group_trf <- function(ang, ...) {
   } else {
     gidx <- get.vertex.attribute(ang, grp_attr)
     
-    V(ang)$type <- 'egroup'
+    V(ang)$type <- 'ent_group'
     V(ang)$name <- get.vertex.attribute(ang, grp_attr)
     V(ang)$label <- get.vertex.attribute(ang, grp_attr)
   }
   
   # Contract the graph by grouping index
-  ang <- contract(ang, as.factor(gidx), vertex.attr.comb=toString)
+  ang <- contract(ang, as.factor(gidx), vertex.attr.comb = toString)
   
   # Tidy up the atrributes
   for (cur_attr in list.vertex.attributes(ang)) {
@@ -1332,13 +1329,13 @@ group_trf <- function(ang, ...) {
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# User friendly degrouping transformation function calls
-degroup <- function(sq, group) {
-  trf(sq, 'degroup_trf', group=group, members=NA, cl=match.call())
+# User friendly dent_grouping transformation function calls
+dent_group <- function(sq, group) {
+  trf(sq, 'dent_group_trf', group=group, members=NA, cl=match.call())
 }
 
 # TODO: Implement, but not so crucial: just avoid unnecessary grouping
-degroup_trf <- function(ang, ...) {
+dent_group_trf <- function(ang, ...) {
   
   group <- list(...)$group
 
@@ -1479,8 +1476,8 @@ get_plopt <- function(theme=NA) {
     # TODO: Attribute color?
     
     # Default element sizes
-    plopt <- c(plopt, vertex_scaling=25, entity_size=15, egroup_size=20)
-    plopt <- c(plopt, attribute_size=5, agroup_size=10, edge_size=1)
+    plopt <- c(plopt, vertex_scaling=25, entity_size=15, ent_group_size=20)
+    plopt <- c(plopt, attribute_size=5, attr_group_size=10, edge_size=1)
 #    plopt <- c(plopt, vertex_contrast_color=vcc)
     plopt
   } 
@@ -1586,7 +1583,7 @@ thevoid <- function(ang, ...) {
   # Delete attributes
   obs <- browseData(ang, ckpt='all')
   ang <- delete.vertices(ang, 
-    is.element(obs[match(V(ang)$name, obs$object), 'objsrc'], centers))
+    is.element(obs[match(V(ang)$name, obs$object), 'h_ent'], centers))
   
   ang
 }
