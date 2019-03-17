@@ -40,21 +40,21 @@ Start to grow the structure from central extract mapping table:
 
 ```{r fig.width=18, fig.height=18}
 # Collect mapping centres
-map_centres <- extract_centre <- 'DM.EXTRACTOR'
+map_centres <- extract_centres <- 'DM.EXTRACTOR'
 
 # Generate the structure
-dm <- grow(dm, extract_centre) %>%
-  grow(extract_centre, depth = 2, width = 0)
+dm <- grow(dm, extract_centres) %>%
+  grow(extract_centres, depth = 2, width = 0)
 
 # Plot by higlighting the mapping centres
-applyHighlight(dm, extract_centre)
+applyHighlight(dm, extract_centres)
 ```
 
 Simplify the structure by removing non-actionable fields and by grouping similar attributes to avoid overly busy output:
 
 ```{r fig.width=20, fig.height=20}
 # Fetch the extracting centre attribute names
-dmea <- grep(paste0(extract_centre, '>'), getElements(dm)$name, value = TRUE)
+dmea <- grep(paste0(extract_centres, '>'), getElements(dm)$name, value = TRUE)
 
 # Remove descriptive or helper attributes
 dm <- void(dm, grep('DESCRIPTION|SELECT', dmea, value = TRUE)) %>%
@@ -94,10 +94,10 @@ Group the attributes to avoid overly busy output:
 dmda <- grep(paste0(upload_centre, '>'), getElements(dm)$name, value = TRUE)
 
 # Remove descriptive or helper attributes
-dm <- void(dm, grep('DESCRIPTION|SELECT', dmda, value = TRUE)) %>%
+dm %<>% void(grep('DESCRIPTION|SELECT', dmda, value = TRUE)) %>%
 
   # Merge the upload specification attributes
-  group('UPLOAD_SPEC', grep('TYPE|OFS|DATA|DELIM|SEQ|RTN', dmda, value = TRUE)) %>%
+  group('UPLOAD_SPEC', grep('TYPE|FUN|VER|ACT|DATA|DEL|SEQ|RTN', dmda, value = TRUE)) %>%
 
   # Merge the upload field specification attributes
   group('UPLOAD_FIELDS', grep('ID|FIELD', dmda, value = TRUE))
@@ -228,7 +228,7 @@ elems <- subset(getElements(dm), grepl(paste0(prep_centres[3], '>'), name), c('n
 
 (ctrl_attrs <- elems[grep('SERVER|USER|SESSIONS|STATUS|DSC|PROCESS', elems$name), ])
 (log_attrs <- elems[grep('HIST|LOG|ERROR|DATE|STARTED|STOPPED|ELAPSED', elems$name), ])
-dm <- group(dm, 'SERVICE.CONTROL', ctrl_attrs$name) %>% group('SERVICE.LOGS', log_attrs$name)
+dm <- group(dm, 'SERVICE_CONTROL', ctrl_attrs$name) %>% group('SERVICE_LOGS', log_attrs$name)
 ```
 
 ## Preparations summary
@@ -238,31 +238,34 @@ applyHighlight(dm, prep_centres)
 ```
 
 # Migration
+Extracting data using DM tool in case of T24 to T24 migration and T24 upload
 
 ## Extracting
+Central element already populated during mapping. Service control elements to be created in case of more serious efforts:
 
 ```{r fig.width=23, fig.height=23}
+extract_centres <- c(paste0('DM.SERVICE.', c('CONTROL', 'CONTROL.CONCAT', 'SCHEDULER')), extract_centres)
 
-(dm <- grow(dm, c('DM.SERVICE.CONTROL', 'DM.SERVICE.CONTROL.CONCAT')) %>%
-  grow('DM.SERVICE.SCHEDULER', depth = 2, width = 0))
+# Grow the structure
+dm %<>% grow(extract_centres) %>% grow(extract_centres[3], depth = 2, width = 0)
 
-group(dm, 'TSA', c('TSA.SERVICE', 'BATCH', 'TSA.WORKLOAD.PROFILE'))
-
-#SERVICE_CONTROL group:
-#'DM.SERVICE.CONTROL', 'DM.SERVICE.CONTROL.CONCAT>', 'DM.SERVICE.SCHEDULER>' 
- 
-#c('DM.SERVICE.CONTROL', 'DM.SERVICE.CONTROL.CONCAT', 'DM.SERVICE.SCHEDULER', 'TSA.SERVICE', 'BATCH', 'TSA.WORKLOAD.PROFILE'
-
-#exclude: id, XX.CURRENT.DIRECTORY, XX.NEW.DIRECTORY, FLAT.FILE.DIR, ERROR.FILE.PATH, UPLOAD.COMPANY, ERROR.FILE.NAME
-
-
-#elems <- getElements(dm)$name
-#dm <- group(dm, map_helper_name,
-#elems[grepl('DM.AA|MAPPING.EXTRACT', elems) & !grepl('id|OUTPUT|APPL', elems)])
-
+# Plot by higlighting the extraction centres
+applyHighlight(dm, extract_centres)
 ```
 
-DM.MAPPING.EXTRACT?
+Simplify the structure by gathering service control elements together:
+
+```{r}
+# Collect DM service control elements
+elems <- getElements(dm)$name
+dm_elems <- elems[grepl('CONTROL$|SERVICE_|CONCAT|SCHED', elems) & !grepl('XX', elems)]
+
+# Group DM service control elements
+dm <- group(dm, 'SERVICE', dm_elems) %>%
+
+  # Group core service control elements
+  group('TSA', c('TSA.SERVICE', 'BATCH', 'TSA.WORKLOAD.PROFILE')) 
+```
 
 ## Uploading
 Mapping the source system data to target system and then attempting to upload
@@ -272,6 +275,7 @@ Verification of a DM.DATA.TRANSLATION record converts incoming file to a format 
 DMV directories created by DM.PREREQUISITE, so verification part of loading. Verify DATA.MAPPING.VERIFICATION to check the file first against DM.MAPPING.DEFINITION
 
 ```{r fig.width=20, fig.height=20}
+dm
 
 # dm <- grow(dm, 'DM.DATA.TRANSLATION') %>% grow('DM.DATA.TRANSLATION', depth = 2, width = 0)
 

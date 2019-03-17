@@ -1,0 +1,71 @@
+---
+title: "T24 Model Bank structure fetching"
+output: html_document
+---
+
+Access only through Browser
+
+```{r}
+suppressWarnings(suppressPackageStartupMessages(library(tidyverse)))
+```
+
+# STANDARD.SELECTION
+Create ENQUIRY:
+
+* FILE.NAME = STANDARD.SELECTION
+* SELECTION = UNLIKE NOFILE...
+* OPERATION.1 = FILE.NAME
+* OPERATION.2 = SYS.FIELD.NAME
+* OPERATION.3 = SYS.REL.FILE
+* OPERATION.4 = SYS.FIELD.NO
+
+Create ENQUIRY.REPORT, REPORT.CONTROL. Generate report and copy via clipboard to text file
+
+```{r}
+col_names <- c('application', 'field', 'link', 'field_no')
+(ss <- read_delim('../../data/raw/T24R18MB_SS.txt', '\t', escape_double = FALSE,
+  col_names = col_names, col_types = cols(), trim_ws = TRUE))
+```
+
+Remove unwanted (most of the time) fields:
+
+```{r}
+service_fields <- c('LOCAL.REF', 'OVERRIDE', 'RECORD.STATUS', 'CURR.NO')
+audit_fields <- c('INPUTTER', 'DATE.TIME', 'AUTHORISER', 'CO.CODE', 'DEPT.CODE', 'AUDITOR.CODE', 'AUDIT.DATE.TIME')
+(ss <- ss[!ss$field %in% c(audit_fields, service_fields), ])
+
+# Reserved fields removal pattern
+r1 <- paste0('RESERVE\\.', 1:10, collapse = '|')
+reserved_fields <- paste('^RESERVED', r1, sep = '|')
+
+# Lots of poissible placeholders for future fields
+as.vector(as.matrix(unique(ss[grepl('^RES', ss$field) & !grepl(reserved_fields, ss$field), 'field'])))
+
+# Remove most prevalent reserved fields
+(ss <- ss[!grepl(reserved_fields, ss$field), ])
+```
+
+Populate application:
+
+https://stackoverflow.com/questions/10554741/fill-in-data-frame-with-values-from-rows-above
+
+```{r}
+
+s1 <- ss[1:19, 'application']
+s2 <- ss[2:20, 'application']
+ifelse(is.na(s2), s1, s2)
+
+```
+
+# PGM.FILE
+Create ENQUIRY:
+
+* FILE.NAME = PGM.FILE
+* SELECTION = TYPE NE B M S
+* OPERATION.1 = @ID
+* OPERATION.2 = TYPE
+* OPERATION.3 = PRODUCT
+
+Run and save results tp csv  file
+
+# Output observations

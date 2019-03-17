@@ -5,6 +5,7 @@
 
 suppressPackageStartupMessages(library(igraph))
 suppressPackageStartupMessages(library(tidyr))
+suppressPackageStartupMessages(library(RColorBrewer))
 
 ################################################################################
 # Analysis object and related methods
@@ -410,19 +411,17 @@ plot_ang <- function(ang, xlab=NULL, main=NULL) {
     if (is.na(ang$partitioning)) {
       
     } else if (!is.na(ang$simplicity)) {
-      mbrpn <- as.numeric(as.factor(membership(V(ang))))
-      #palette <- colorRampPalette(c('yellow','brown'), alpha=0.8)
-      #colrs <- palette(max(mbrpn))[mbrpn]
-      colrs <- rainbow(max(mbrpn), alpha=0.8)[mbrpn]
-      plopt <- c(plopt, vertex.color=list(colrs))
+      n_mbrp <- as.numeric(as.factor(membership(V(ang))))
+      colors <- brewer.pal(n_mbrp, name = 'Set3')
+      plopt <- c(plopt, vertex.color=list(colors))
     }
   }
   if (ang$theme == 'minimalist') {
     if (is.na(ang$partitioning)) {
 
     } else if (!is.na(ang$simplicity)) {
-      mbrpn <- as.numeric(as.factor(membership(V(ang))))
-      colrs <- gray.colors(max(mbrpn))[mbrpn]
+      n_mbrp <- as.numeric(as.factor(membership(V(ang))))
+      colrs <- gray.colors(max(n_mbrp))[n_mbrp]
       plopt <- c(plopt, vertex.color=list(colrs))
     }
   }
@@ -464,13 +463,15 @@ plot_ang <- function(ang, xlab=NULL, main=NULL) {
   if (is.na(ang$partitioning2)) {
     V(ang)$color <- thmopt$vertex_color
   } else {
-    nc <- length(unique(V(ang)$membership2))
-    V(ang)$color <- rainbow(nc)[as.factor(V(ang)$membership2)]
+    n_mbrp <- length(unique(V(ang)$membership2))
+#    V(ang)$color <- rainbow(nc)[as.factor(V(ang)$membership2)]
+    V(ang)$color <- brewer.pal(n_mbrp, name = 'Set3')[as.factor(V(ang)$membership2)]
   }
   
   # Highlight
   hl_idx <- as.logical(V(ang)$contrast)
-  V(ang)[hl_idx]$color <- thmopt$vertex_contrast_color
+  # V(ang)[hl_idx]$color <- thmopt$vertex_contrast_color
+  V(ang)[hl_idx]$color = rgb(t(col2rgb(V(ang)[hl_idx]$color)/1.7), maxColorValue = 255)
   V(ang)[hl_idx]$label.cex <- thmopt$vertex_contrast_label_cex
   
   # Label sizes in different elements
