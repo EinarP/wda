@@ -33,16 +33,18 @@ nrow(ss <- ss[!is.na(ss$field), ])
 ss <- fill(ss, application)
 
 # Remove @ID duplicates
-nrow(ss <- ss[!(ss$field_no == 0 & ss$field != '@ID'), ])
+nrow(ss <- ss[!(!is.na(ss$field_no) & ss$field_no == '0' & ss$field != '@ID'), ])
 
 # Remove unwanted (most of the time) service and audit fields
 service_fields <- c('LOCAL.REF', 'OVERRIDE', 'RECORD.STATUS', 'CURR.NO')
 audit_fields <- c('INPUTTER', 'DATE.TIME', 'AUTHORISER', 'CO.CODE', 'DEPT.CODE', 'AUDITOR.CODE', 'AUDIT.DATE.TIME')
-nrow(ss <- ss[!ss$field %in% c(audit_fields, service_fields), ])
+nrow(ss <- ss[!ss$field %in% c(service_fields, audit_fields), ])
 
 # Reserved fields removal pattern
-r1 <- paste0('RESERVE\\.', 1:10, collapse = '|')
-reserved_fields <- paste('^RESERVED', r1, sep = '|')
+r1 <- paste0('^RESERVE\\.', 1:10, collapse = '|')
+r2 <- paste0('^SPARE\\.', 1:10, collapse = '|')
+
+reserved_fields <- paste('^RESERVED|^RES\\.', r1, r2, sep = '|')
 
 # Lots of poissible placeholders for future fields
 as.vector(as.matrix(unique(ss[grepl('^RES', ss$field) & !grepl(reserved_fields, ss$field), 'field'])))
@@ -65,12 +67,13 @@ Run and save results to csv  file
 ```{r}
 (pf <- read_csv('../../data/raw/T24R18MB_PGM.csv', col_types = cols()))
 
-nrow(pf <- pf[!complete.cases(pf), ])
+nrow(pf <- pf[complete.cases(pf), ])
 ```
 
 # Observations
 
 ```{r}
+# Structure from SS
 ss$object <- paste(ss$application, ss$field, sep = '>')
 ss$object <- ifelse(is.na(ss$link), ss$object, paste(ss$object, ss$link, sep = '|'))
 
@@ -79,6 +82,14 @@ ss$value <- ifelse(is.na(ss$link), NA, 'strong')
 
 obs <- ss[ ,c('object', 'property', 'value')]
 
-View(obs)
+# Partitionining from PGM.FILE
+pf$property <- 'product'
+colnames(pf) <- c('object', 'type', 'value', 'property')
+
+# Put all together
+obs <- rbind(obs, pf[ ,c('object', 'property', 'value')])
+
+write.csv(obs, file = '../../data/T24R18MB.csv', row.names=FALSE, na = '')
 ```
+
 
