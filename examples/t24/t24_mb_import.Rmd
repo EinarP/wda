@@ -1,5 +1,5 @@
 ---
-title: "T24 Model Bank structure fetching"
+title: "T24R18MB fetching"
 output: html_document
 ---
 
@@ -25,14 +25,20 @@ Create ENQUIRY.REPORT, REPORT.CONTROL. Generate report and copy via clipboard to
 col_names <- c('application', 'field', 'link', 'field_no')
 (ss <- read_delim('../../data/raw/T24R18MB_SS.txt', '\t', escape_double = FALSE,
   col_names = col_names, col_types = cols(), trim_ws = TRUE))
-```
 
-Remove unwanted (most of the time) fields:
+# Remove strange entries with no field populated
+nrow(ss <- ss[!is.na(ss$field), ])
 
-```{r}
+# Populate application field
+ss <- fill(ss, application)
+
+# Remove @ID duplicates
+nrow(ss <- ss[!(ss$field_no == 0 & ss$field != '@ID'), ])
+
+# Remove unwanted (most of the time) service and audit fields
 service_fields <- c('LOCAL.REF', 'OVERRIDE', 'RECORD.STATUS', 'CURR.NO')
 audit_fields <- c('INPUTTER', 'DATE.TIME', 'AUTHORISER', 'CO.CODE', 'DEPT.CODE', 'AUDITOR.CODE', 'AUDIT.DATE.TIME')
-(ss <- ss[!ss$field %in% c(audit_fields, service_fields), ])
+nrow(ss <- ss[!ss$field %in% c(audit_fields, service_fields), ])
 
 # Reserved fields removal pattern
 r1 <- paste0('RESERVE\\.', 1:10, collapse = '|')
@@ -42,19 +48,7 @@ reserved_fields <- paste('^RESERVED', r1, sep = '|')
 as.vector(as.matrix(unique(ss[grepl('^RES', ss$field) & !grepl(reserved_fields, ss$field), 'field'])))
 
 # Remove most prevalent reserved fields
-(ss <- ss[!grepl(reserved_fields, ss$field), ])
-```
-
-Populate application:
-
-https://stackoverflow.com/questions/10554741/fill-in-data-frame-with-values-from-rows-above
-
-```{r}
-
-s1 <- ss[1:19, 'application']
-s2 <- ss[2:20, 'application']
-ifelse(is.na(s2), s1, s2)
-
+nrow(ss <- ss[!grepl(reserved_fields, ss$field), ])
 ```
 
 # PGM.FILE
@@ -66,6 +60,25 @@ Create ENQUIRY:
 * OPERATION.2 = TYPE
 * OPERATION.3 = PRODUCT
 
-Run and save results tp csv  file
+Run and save results to csv  file
 
-# Output observations
+```{r}
+(pf <- read_csv('../../data/raw/T24R18MB_PGM.csv', col_types = cols()))
+
+nrow(pf <- pf[!complete.cases(pf), ])
+```
+
+# Observations
+
+```{r}
+ss$object <- paste(ss$application, ss$field, sep = '>')
+ss$object <- ifelse(is.na(ss$link), ss$object, paste(ss$object, ss$link, sep = '|'))
+
+ss$property <- ifelse(is.na(ss$link), NA, 'type')
+ss$value <- ifelse(is.na(ss$link), NA, 'strong')
+
+obs <- ss[ ,c('object', 'property', 'value')]
+
+View(obs)
+```
+
