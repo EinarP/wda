@@ -2,179 +2,38 @@
 title: "AA Module Overview"
 output:
   html_document: default
-  word_document: default
 ---
 This is an overview of the AA module
-
 ```{r}
+suppressWarnings(suppressPackageStartupMessages(library(tidyverse)))
+
 # Load analysis functions (TODO: still not happy with the name...)
 source('../../wda.r')
 
-# Load obeservations by ignoring error conditions
-suppressWarnings(library(readxl))
-tobs <- read.csv('../../../data/T24R10MB.csv', stringsAsFactors = FALSE)
-tobs <- tobs[tobs$property!='ERROR', ]
+# Load obeservations
+tobs <- read_csv('../../data/T24R18MB.csv', col_types = cols())
 
 aa <- analysis('Arrangement Architecture Overview', 'tobs')
 
-# Observations made
-str(tobs_wide)
 ```
 
-## Context/Baseline
+Many entities even without observed links:
 
-There are quite a few entities even without observed links:
+```{r message=FALSE, fig.height=15, fig.width=15}
+# Grow the big picture structure
+aa <- grow(aa, 'AA.ARRANGEMENT') %>% applyPartitioning2('product')
 
-```{r message=FALSE}
-aa <- grow(aa, 'AA.ARRANGEMENT')
 applyHighlight(aa, 'AA.ARRANGEMENT')
 
-nrow(getElements(aa))
+# Total number of entities
+nrow(elems <- getElements(aa))
 
-# Remove irrelevant centers
-# voidList <- getCenters(lsov)$name
-# baseList <- c(initList, 'CUSTOMER')
-# baseList <- c(keepList, 'AA.PRODUCT','AA.PROPERTY','AA.ARRANGEMENT.ACTIVITY')
-# lsov <- void(lsov, voidList[!voidList %in% baseList])
-#lsov
-
-# aaList <- c('AA.PRODUCT','AA.PROPERTY','AA.ARRANGEMENT.ACTIVITY')
-# lsov <- grow(lsov, aaList, width=0)
-
-# Keep track of each module separately
-# lsov <- applyPartitioning(lsov, 'mbrp')
-#lsov
+# Products shown
+unique(elems$membership2)
 ```
 
-## Value date
+ *TODO: legends to match products to colors*
+Convert color hex code to color names
+https://stat.ethz.ch/pipermail/r-help/2015-April/427663.html
 
-Add scanned links and divide into two parallel sequences by module
-
-```{r}
-
-# aasch <- void(lsov, 'LD.LOANS.AND.DEPOSITS', name='AA analysis')
-
-# lsov <- grow(lsov, 'AA.ARRANGEMENT', width=0, attrs=TRUE)
-# applySeed(aasch, 390)
-
-# Separate analysis branch for LD
-# ldsch <- void(lsov, 'AA.ARRANGEMENT', name='LD analysis')
-# lsov <- grow(lsov, 'LD.LOANS.AND.DEPOSITS', width=0, attrs=TRUE)
-
-# TODO: Remove irrelevant attributes
-applyAlternation(lsov)
-```
-
-### AA module exloratory analysis
-
-Number of tables in AA module:
-
-> nrow(aaobs[!is.na(aaobs$mbrp), ])
-[1] 2428
-
-as it is not stricty normal... even more
-
-Nonempty tables
-
-> nrow(aaobs[!is.na(aaobs$mbrp) & aaobs$wt_volrec > 0, ])
-[1] 1453
-
-Linked to AA.ARRANGEMENT
-
-> getCenters(lsov, ctype = 'entity')$name
- [1] "AA.ARRANGEMENT"               "AA.ARR.PRODUCT.ACCESS"        "AA.ARR.PROXY.PERMISSIONS"     "COMPANY"                     
- [5] "CURRENCY"                     "CUSTOMER"                     "AA.PRODUCT.GROUP"             "AA.PRODUCT.LINE"             
- [9] "AA.PRODUCT"                   "AA.PROPERTY"                  "AA.PRD.CAT.PRODUCT.ACCESS"    "AA.PRD.CAT.PROXY.PERMISSIONS"
-[13] "AA.PRD.DES.PRODUCT.ACCESS"    "AA.PRD.DES.PROXY.PERMISSIONS" "AA.PRD.PRF.PRODUCT.ACCESS"    "AA.PRD.PRF.PROXY.PERMISSIONS"
-[17] "EB.EXTERNAL.USER"      
-
-
-Add scanned LD links
-
-```{r}
-
-# Add scanned LD links
-lsov <- grow(lsov, c('LD.LOANS.AND.DEPOSITS'), ckpt='valdate')
-lsov <- grow(lsov, c('STMT.ENTRY'), ckpt='baseline')
-
-# After checking source tables remove irrelevant entities
-valList <- c(baseList, 'LD.LOANS.AND.DEPOSITS', 'LD.SCHEDULE.DEFINE',
-  'STMT.ENTRY', 'CUSTOMER', 'ACCOUNT')
-lsov <- void(lsov, !(getCenters(lsov)$name %in% valList))
-lsov
-
-
-```
-
-Add scanned AA links
-
-# TODO: Determine why AA disbursement FT was not detected by scanning
-
-```{r}
-keepList <- getCenters(lsov, ctype='entity')$name
-
-lsov <- grow(lsov, 'AA.ARRANGEMENT', ckpt='valdate')
-# applyAlternation(aasch)
-
-valList <- c(keepList, 'ACCOUNT', 'STMT.ENTRY', 'FUNDS.TRANSFER', 'AA.ARR.ACCOUNT')
-valList <- c(valList, 'AA.ARR.PAYMENT.SCHEDULE', 'AA.SCHEDULED.ACTIVITY')
-lsov <- void(lsov, !(getCenters(lsov)$name %in% valList))
-lsov
-```
-
-## Repayment date
-
-New and interesting AA.ACTIVITY.BALANCES>@ID|AA.ARRANGEMENT
-
-Paid back Good Customer
-
-Rescan after COB?
-
-```{r}
-# Separate analysis for good and bad loans
-lsovg <- applySeed(lsov, 1)
-lsovb <- applySeed(lsov, 101)
-```
-## Maturity date
-
-EB.CONTRACT.BALANCES?
-
-```{r}
-# Separate analysis for good and bad loans
-lsovg <- applySeed(lsovg, 2)
-lsovb <- applySeed(lsovb, 102)
-```
-
-## Overdue repayment
-
-```{r}
-lsovb <- applySeed(lsovb, 103)
-```
-
-## Archival
-
-Value tracking.... Statuses, balances?
-
-```{r}
-# Separate analysis for good and bad loans
-lsovg <- applySeed(lsovg, 4)
-lsovb <- applySeed(lsovb, 104)
-```
-
-## Conclusions
-
-What can we conclude based on analysis (or in word only?)
-
-```{r}
-# Good loan sequence overview summary
-sqmain <- c('baseline', 'value date', 'repayment date', 'maturity date')
-sqmain2 <- c(sqmain, 'archival date')
-plot(lsovg, main=sqmain2, steps=c(5,10,11,12,13), ncol=3)
-
-# Bad loan sequence overview summary
-sqmain <- c('baseline', 'value date', 'repayment date', 'maturity date')
-sqmain2 <- c(sqmain, 'overdue repayment date', 'archival date')
-plot(lsovb, main=sqmain2, steps=c(5,10,11,12,13,14), ncol=3)
-
-```
-
+*TODO: Fetch EB.PRODUCT*
