@@ -1,0 +1,41 @@
+---
+title: "TIF Overview"
+output:
+  html_document: default
+---
+This is an overview of Integration Framework T24 part
+
+```{r}
+suppressWarnings(suppressPackageStartupMessages(library(tidyverse)))
+
+# Load analysis functions (TODO: still not happy with the name...)
+source('../../wda.r')
+
+# Load observations
+tobs <- read_csv('../../data/T24R18MB.csv', col_types = cols())
+
+# Initiate the sequence
+tif <- analysis('Integration Framework Overview', 'tobs')
+```
+
+# Module overview
+
+Grow the big picture structure from product observations:
+
+```{r message=FALSE, fig.height=15, fig.width=15}
+if_product_obs <- browseData(tif) %>% filter(product == 'IF')
+(tif <- grow(tif, if_product_obs$object))
+grow(tif, 'IF.EVENTS.INTERFACE.TABLE', depth = 1)
+grow(tif, if_product_obs$object, depth = 1, width = 0)
+```
+
+
+# Configuration
+
+
+# Processing
+grow(tif, 'IF.INTEGRATION.SERVICE.PARAM', depth = 1)
+ *TODO: legends to match products to colors*
+Convert color hex code to color names
+https://stat.ethz.ch/pipermail/r-help/2015-April/427663.html
+

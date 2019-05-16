@@ -1,5 +1,5 @@
 ---
-title: "SEQUENTIAL BUSINESS ANALYSIS SUPPORT TOOL"
+title: "GENERATIVE BUSINESS ANALYSIS SUPPORT TOOL"
 output:
   html_document: 
     fig_height: 8
@@ -14,7 +14,7 @@ output:
 ```{r echo = FALSE}
 suppressWarnings(suppressPackageStartupMessages(library(knitr)))
 ```
-An authoritative source (The BABOK Guide [BABOK_Guide_v3_Member.pdf]) defines business analysis as practice of enabling change in an enterprise by defining needs and recommending solutions that deliver value to stakeholders. Sequential business analysis (SBA) method proposes to clarify these needs and solutions iteratively through sequences of specific analysis steps. This method (explained in more detail elsewhere (*TODO: link*)) is heavily influenced by late Christopher Alexander's architectural theories [NoO] and is expected to facilitate particularly adaptive analyses. As generation of sequences can be very laborious, such analysis process is practically unthinkable without proper support tools. Principles of such tool (the analysis ecosystem) is described below first and then the implemented fundamental sequence steps (transformations). Conduction of analyses is illustrated by the tool usage meta-analysis
+An authoritative source (The BABOK Guide [BABOK_Guide_v3_Member.pdf]) defines business analysis as practice of enabling change in an enterprise by defining needs and recommending solutions that deliver value to stakeholders. Generative business analysis (GBA) method proposes to clarify these needs and solutions iteratively through sequences of specific analysis steps. This method (explained in more detail elsewhere (*TODO: link*)) is heavily influenced by late Christopher Alexander's architectural theories [NoO] and is expected to facilitate particularly adaptive analyses. As generation of sequences can be very laborious, such analysis process is practically unthinkable without proper support tools. Principles of such tool (the analysis ecosystem) is described below first and then the implemented fundamental sequence steps (transformations). Conduction of analyses is illustrated by the tool usage meta-analysis
 
 # The Analysis Ecosystem
 The analysis ecosystem is a collection of observations and R functions for generating sequences of transformations based on them:
