@@ -360,6 +360,8 @@ plot.asq <- function(sq, xlab=NULL, main=NULL, steps=NULL, ncol=2) {
 # Plot the analysis graph
 plot_ang <- function(ang, xlab=NULL, main=NULL) {
   
+# TODO: Why colorbrewer called twice?
+  
   # Retrieve pre-defined plotting options  
   thmopt <- get_plopt(ang$theme)
 

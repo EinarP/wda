@@ -44,7 +44,7 @@ nrow(ss <- ss[!ss$field %in% c(service_fields, audit_fields), ])
 r1 <- paste0('^RESERVE\\.', 1:10, collapse = '|')
 r2 <- paste0('^SPARE\\.', 1:10, collapse = '|')
 
-reserved_fields <- paste('^RESERVED|^RES\\.', r1, r2, sep = '|')
+reserved_fields <- paste('^RESERVED|^RESERVER|^RES\\.', r1, r2, sep = '|')
 
 # Lots of poissible placeholders for future fields
 as.vector(as.matrix(unique(ss[grepl('^RES', ss$field) & !grepl(reserved_fields, ss$field), 'field'])))

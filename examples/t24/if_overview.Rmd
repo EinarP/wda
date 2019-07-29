@@ -19,22 +19,79 @@ tif <- analysis('Integration Framework Overview', 'tobs')
 ```
 
 # Module overview
+Inbound message out of T24 to middleware and vice versa
 
 Grow the big picture structure from product observations:
 
 ```{r message=FALSE, fig.height=15, fig.width=15}
-if_product_obs <- browseData(tif) %>% filter(product == 'IF')
-(tif <- grow(tif, if_product_obs$object))
-grow(tif, 'IF.EVENTS.INTERFACE.TABLE', depth = 1)
-grow(tif, if_product_obs$object, depth = 1, width = 0)
+# Entities belonging to IF product
+product_obs <- browseData(tif) %>% filter(product == 'IF')
+
+# Generate initial structure separating products
+(tif <- grow(tif, product_obs$object) %>%
+  grow(product_obs$object, depth = 1, width = 0) %>%
+  applyPartitioning2('product'))
 ```
 
+# Flow definition
+Event is a generic term for the notification which T24 emits when a business event occurs.
 
-# Configuration
+IF.EXIT.POINTS defines the hook, or API, in T24 to which an Event can be linked
 
+XX<EXIT.POINT
+XX>XX.INTEG.FLOW
 
-# Processing
+Add observed link:
+XX>XX.INTEG.FLOW|IF.INTEGRATION.FLOW.CATALOG
+
+Version, Application, Component Service, TSA Service, Delivery Message
+
+Flow Catalog (IF.INTEGRATION.FLOW.CATALOG)
+
+Integration Flow. Defines the layout of an XML message which will leave T24 
+when a business event occurs 
+
+Enrichment (joins) is process of retrieving data which is stored in T24 for inclusion on the notification message 
+
+A T24 table which contains details of all the Integration Flows which have been created by the system integrators. 
+
+IF.INTEGRATION.FLOW.CATALOG>XX.EXIT.POINT|IF.EXIT.POINTS ???
+
+Service Repository. Contains details of all the available component services, their 
+operations, plus the data types and direction (in/out/inout) for 
+each operation argument. 
+
+IF.CALLBACK.IMPL.CATALOG catalogs the name of the local routines that implement callback APIs 
+
+```{r message=FALSE, fig.height=15, fig.width=15}
+
+```
+
+# Event triggering
+Store and Forward Table (IF.EVENTS.INTERFACE.TABLE)
+
+- Store and forward table for event messages.
+- Events stored here will be processed by a service or adapter 
+- The processed events would get their timestamp updated 
+
+IF.INTERFACE.TABLE>EVENT.TYPE|IF.INTEGRATION.FLOW.CATALOG ???
+
+# Event polling
+IF.CALLBACK.IMPL.CATALOG record SYSTEM only?
+
+Event Batching (TSA.SERVICE>INTEGRATION.SERVICE)
+Service that performs the delivery of the events which are stored 
+in the store and forward table. 
+
+Parameter Table (IF.INTEGRATION.SERVICE.PARAM)
+Contains configuration parameters for the Integration Service 
+Note — Integration Service is not required with custom adapters 
+
+Transform table- IF.INTEGRATION.FLOW.TRANSFORM 
+This table specifies the transformation (xslt) to be applied on a flow before it is delivered to a JMS queue 
+
 grow(tif, 'IF.INTEGRATION.SERVICE.PARAM', depth = 1)
+
  *TODO: legends to match products to colors*
 Convert color hex code to color names
 https://stat.ethz.ch/pipermail/r-help/2015-April/427663.html

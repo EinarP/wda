@@ -1,5 +1,5 @@
 ---
-title: "AA Module Overview"
+title: "Arrangement Architecture"
 output:
   html_document: default
 ---
@@ -10,13 +10,14 @@ suppressWarnings(suppressPackageStartupMessages(library(tidyverse)))
 # Load analysis functions (TODO: still not happy with the name...)
 source('../../wda.r')
 
-# Load obeservations
+# Load observations
 tobs <- read_csv('../../data/T24R18MB.csv', col_types = cols())
 
-aa <- analysis('Arrangement Architecture Overview', 'tobs')
+aa <- analysis('Arrangement Architecture', 'tobs')
 
 ```
 
+# Overview
 Many entities even without observed links:
 
 ```{r message=FALSE, fig.height=15, fig.width=15}
@@ -32,8 +33,30 @@ nrow(elems <- getElements(aa))
 unique(elems$membership2)
 ```
 
- *TODO: legends to match products to colors*
+*TODO: legends to match products to colors*
 Convert color hex code to color names
 https://stat.ethz.ch/pipermail/r-help/2015-April/427663.html
 
 *TODO: Fetch EB.PRODUCT*
+
+# Product organisation
+
+Branch away for going into details and later group in original sequence
+
+Property can be set Mandatory or Optional in Product Group! (always fail in quiz)
+
+```{r message=FALSE, fig.height=15, fig.width=15}
+applyHighlight(aa, 'AA.PRODUCT.LINE') 
+applyHighlight(aa, 'AA.PRODUCT.GROUP') 
+applyHighlight(aa, 'AA.PRODUCT')
+```
+
+# Building blocks
+
+AA.PROPERTY.CLASS, AA.PROPERTY
+
+# Banking products
+
+Product conditions are store in what tables?
+
+# Lifecycle management
