@@ -178,6 +178,14 @@ as_obs <- function(x) {
 # Convert a data frame to ENTITY observations
 as_obs_entity <- function(df, entity = 'ENTITY', id_cols = NULL) {
   
+  # Data type observations as entity>attribute>type=x
+  type_obs <- summarise_all(df, class) %>%
+    gather(variable, class) %>%
+    mutate(object = paste0(entity, '>', variable)) %>%
+    mutate(property = 'type', checkpoint = 'all', instance = NA) %>%
+    rename(value = class) %>%
+    select(object, property, value, checkpoint, instance)
+  
   # Same values differentiated by checkpoint
   if (!('checkpoint' %in% colnames(df))) {
     df$checkpoint <- 'all'
@@ -203,16 +211,8 @@ as_obs_entity <- function(df, entity = 'ENTITY', id_cols = NULL) {
   cols <- c('object', 'property', 'value', 'checkpoint', 'instance')
   df_long <- data.frame(df_long[ ,cols])
   
-  # Data type observations as entity>attribute>type=x
-  lapply(colnames(df), function (x) {
-    if (!(x %in% c('checkpoint', 'instance'))) {
-      type_obs <- data.frame(object = paste0(entity, '>', x), property = 'type',
-        value = class(df[ ,x]), checkpoint = 'all', instance = NA)
-      df_long <<- rbind(df_long, type_obs)
-    }
-  })
-
-  df_long
+  # Output combine data and type observations
+  rbind(df_long, type_obs)
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
