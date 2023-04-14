@@ -1,0 +1,27 @@
+---
+title: "NoO to tidy text"
+output: html_document
+---
+
+
+```{r}
+library(tidyverse)
+library(pdftools)
+```
+
+
+Should I merge the books to one text right away or would this make tracking pages more difficult?
+
+```{r}
+# Perhaps include other too volumes later as well
+noo1 <- pdf_text("data/noo1.pdf")
+noo2 <- pdf_text("data/noo2.pdf")
+
+```
+
+
+```{r}
+glimpse(noo1)
+
+summary(noo1)
+```

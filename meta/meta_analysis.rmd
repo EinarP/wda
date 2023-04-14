@@ -22,7 +22,7 @@ The analysis ecosystem is a collection of observations and R functions for gener
 ```{r}
 # Load transformation functions 
 # TODO: Split into multiple files and package
-source('../wda.R')
+source('../whoa.R')
 source('../obs.R')
 ```
 
@@ -357,7 +357,7 @@ getAlternation(meta)
 ## Simplicity
 ```{r}
 # Simple display of 10 biggest centers
-applySimplicity(meta, n=10)
+# applySimplicity(meta, n=10)
 ```
 
 # Creating Order

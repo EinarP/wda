@@ -3,8 +3,8 @@
 # TODO: Use highlighting in (partitioning, sizing, etc.) error handling
 # TODO: Non-igraph layouts: trees, timelines?
 
+suppressPackageStartupMessages(library(tidyverse))
 suppressPackageStartupMessages(library(igraph))
-suppressPackageStartupMessages(library(tidyr))
 suppressPackageStartupMessages(library(RColorBrewer))
 
 ################################################################################
@@ -171,51 +171,58 @@ as_obs <- function(x) {
   }
 
   # TODO: obsl <- unique(obsl[ ,1:4])?
-  cols <- c('object', 'property', 'value', 'checkpoint', 'instance')
-  new_obs[ ,cols]
+#  cols <- c('object', 'property', 'value', 'checkpoint', 'instance')
+#  new_obs[ ,cols]
+
+  # TODO: Cannot convert to tibble as knitting will not finish  
+  new_obs %>%
+    select(object, property, value, checkpoint, instance)
 }
 
 # Convert a data frame to ENTITY observations
 as_obs_entity <- function(df, entity = 'ENTITY', id_cols = NULL) {
   
-  # Data type observations as entity>attribute>type=x
-  type_obs <- summarise_all(df, class) %>%
-    gather(variable, class) %>%
-    mutate(object = paste0(entity, '>', variable)) %>%
-    mutate(property = 'type', checkpoint = 'all', instance = NA) %>%
-    rename(value = class) %>%
-    select(object, property, value, checkpoint, instance)
+  if (nrow(df) > 0) {
+
+    # TODO: Handling of multiple classes of data type observations
+    
+    # Data type observations
+    type_obs <- as_tibble(lapply(df, function(x) class(x)[1])) %>%
+      gather(key = 'variable', value = 'class') %>%
+      mutate(object = paste0(entity, '>', variable)) %>%
+      mutate(property = 'type', checkpoint = 'all', instance = NA) %>%
+      rename(value = class) %>%
+      select(object, property, value, checkpoint, instance)
   
-  # Same values differentiated by checkpoint
-  if (!('checkpoint' %in% colnames(df))) {
-    df$checkpoint <- 'all'
-  }
-  
-  # Unique Id
-  if (missing(id_cols)) {
-    df$instance <- NA
+    
+    # Add missing columns if any
+    if (!('checkpoint' %in% colnames(df))) {
+      df$checkpoint <- 'all'
+    }
+
+    if (missing(id_cols)) {
+      df$instance <- NA
+    } else {
+      df$instance <- do.call(paste, c(df[c(id_cols)], sep = '_'))
+    }
+
+    # Value observations
+    value_obs <- df %>%
+      mutate_all(as.character) %>%
+      gather(object, value, -checkpoint, -instance) %>%
+      mutate(object = paste0(entity, '>', object), property = 'value') %>%
+      select(object, property, value, checkpoint, instance)
+
+    rbind(type_obs, value_obs)
   } else {
-    df$instance <- do.call(paste, c(df[c(id_cols)], sep = '_'))
+    
+    # Convert empty data frame columns to fake data type observations
+    tibble(object = paste0(entity, '>', colnames(df))) %>%
+      mutate(property = 'type', value = 'character', checkpoint = 'all', instance = NA)
   }
-
-  # Reshape to long format
-  df_long <- data.frame(apply(df, 2, as.character), stringsAsFactors = FALSE)
-  df_long <- gather(df_long, object, value, -checkpoint, -instance)
-
-  # Value observations
-  df_long$object <- paste0(entity, '>', df_long$object)
-  df_long$property <- 'value'
-  df_long$checkpoint <- as.character(df_long$checkpoint)
-
-  # Currently used columns
-  cols <- c('object', 'property', 'value', 'checkpoint', 'instance')
-  df_long <- data.frame(df_long[ ,cols])
-  
-  # Output combine data and type observations
-  rbind(df_long, type_obs)
 }
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#------------------------------------------------------------------------------#
 
 # Internal function for setting tranformation attributes
 set_asq_attr <- function(ang, cl, ...) {
@@ -239,7 +246,7 @@ set_asq_attr <- function(ang, cl, ...) {
   ang
 }
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#------------------------------------------------------------------------------#
 
 # TODO: Adjust the structure to match the current checkpoint
 trf_checkpoint <- function(ang) {
@@ -1501,7 +1508,8 @@ browseLayouts <- function(sq, plot=TRUE, ...) {
   layouts <- grep("^layout_", ls("package:igraph"), value=TRUE)[-1]
   
   # TODO: bipartite if alternation=TRUE
-  layouts <- layouts[!grepl("bipartite|nicely|sugiyama|tree", layouts)]
+#  layouts <- layouts[!grepl("bipartite|nicely|sugiyama|tree", layouts)]
+  layouts <- layouts[!grepl("bipartite|nicely|sugiyama", layouts)]
   
   # Plot or list layouts
   if (plot) {
